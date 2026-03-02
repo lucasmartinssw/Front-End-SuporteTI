@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-// Definição da URL base do seu back-end
+//  URL base do seu back-end
 const API_URL = "http://127.0.0.1:8000";
 
 interface LoginProps {
