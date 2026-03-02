@@ -20,8 +20,36 @@ export default function App() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
 
-  // Mock inicial
+  // Carregar e persistir tickets no localStorage
   useEffect(() => {
+    // Tentar carregar do localStorage
+    const storedTickets = localStorage.getItem('tickets');
+    
+    if (storedTickets) {
+      try {
+        const parsed = JSON.parse(storedTickets);
+        // Converter strings de data de volta para Date
+        const ticketsWithDates = parsed.map((t: any) => ({
+          ...t,
+          createdAt: new Date(t.createdAt),
+          updatedAt: new Date(t.updatedAt),
+          comments: t.comments.map((c: any) => ({
+            ...c,
+            timestamp: new Date(c.timestamp)
+          }))
+        }));
+        setTickets(ticketsWithDates);
+      } catch (error) {
+        console.error('Erro ao carregar tickets:', error);
+        loadMockTickets();
+      }
+    } else {
+      loadMockTickets();
+    }
+  }, []);
+
+  // Função para carregar tickets mock iniciais
+  const loadMockTickets = () => {
     const mockTickets: Ticket[] = [
       {
         id: '1',
@@ -51,7 +79,8 @@ export default function App() {
       }
     ];
     setTickets(mockTickets);
-  }, []);
+    localStorage.setItem('tickets', JSON.stringify(mockTickets));
+  };
 
   // 🚀 Se não estiver logado, mostra tela de login
   if (!isAuthenticated) {
@@ -76,17 +105,21 @@ export default function App() {
       updatedAt: new Date(),
       comments: []
     };
-    setTickets(prev => [newTicket, ...prev]);
+    const updatedTickets = [newTicket, ...tickets];
+    setTickets(updatedTickets);
+    localStorage.setItem('tickets', JSON.stringify(updatedTickets));
     setActiveView('tickets');
     toast.success('Chamado enviado com sucesso!');
   };
 
   const handleStatusUpdate = (ticketId: string, status: Ticket['status']) => {
-    setTickets(prev => prev.map(ticket => 
+    const updatedTickets = tickets.map(ticket => 
       ticket.id === ticketId 
         ? { ...ticket, status, updatedAt: new Date() }
         : ticket
-    ));
+    );
+    setTickets(updatedTickets);
+    localStorage.setItem('tickets', JSON.stringify(updatedTickets));
     if (selectedTicket?.id === ticketId) {
       setSelectedTicket(prev => prev ? { ...prev, status, updatedAt: new Date() } : null);
     }
@@ -94,11 +127,13 @@ export default function App() {
   };
 
   const handleAssignTicket = (ticketId: string, assignee: string) => {
-    setTickets(prev => prev.map(ticket => 
+    const updatedTickets = tickets.map(ticket => 
       ticket.id === ticketId 
         ? { ...ticket, assignedTo: assignee, updatedAt: new Date() }
         : ticket
-    ));
+    );
+    setTickets(updatedTickets);
+    localStorage.setItem('tickets', JSON.stringify(updatedTickets));
     if (selectedTicket?.id === ticketId) {
       setSelectedTicket(prev => prev ? { ...prev, assignedTo: assignee, updatedAt: new Date() } : null);
     }
@@ -113,11 +148,13 @@ export default function App() {
       timestamp: new Date(),
       isInternal
     };
-    setTickets(prev => prev.map(ticket => 
+    const updatedTickets = tickets.map(ticket => 
       ticket.id === ticketId 
         ? { ...ticket, comments: [...ticket.comments, newComment], updatedAt: new Date() }
         : ticket
-    ));
+    );
+    setTickets(updatedTickets);
+    localStorage.setItem('tickets', JSON.stringify(updatedTickets));
     if (selectedTicket?.id === ticketId) {
       setSelectedTicket(prev => prev ? { ...prev, comments: [...prev.comments, newComment], updatedAt: new Date() } : null);
     }
