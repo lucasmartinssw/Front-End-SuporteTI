@@ -16,6 +16,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<'client' | 'it-executive'>('client');
   const [userEmail, setUserEmail] = useState('');
+  const [userName, setUserName] = useState('');
   const [activeView, setActiveView] = useState<'dashboard' | 'tickets' | 'submit' | 'detail'>('dashboard');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -86,9 +87,10 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <Login
-        onLogin={(email, role) => {
+        onLogin={(email, role, name) => {
           setUserEmail(email);
           setUserRole(role);
+          setUserName(name);
           setIsAuthenticated(true);
         }}
       />
@@ -281,7 +283,7 @@ export default function App() {
               </nav>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-700">{userEmail}</span>
+              <span className="text-sm text-gray-700">Bem-vindo, <strong>{userName}</strong></span>
               <button 
                 onClick={() => setIsAuthenticated(false)}
                 className="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-md transition-colors duration-200"

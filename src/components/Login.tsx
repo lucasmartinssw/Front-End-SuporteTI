@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { Ticket as TicketIcon } from "lucide-react";
 
 //  URL base do seu back-end
 const API_URL = "http://127.0.0.1:8000";
 
 interface LoginProps {
-  onLogin: (email: string, role: string, token: string) => void;
+  onLogin: (email: string, role: string, name: string) => void;
 }
 
 type UserRole = "usuario" | "tecnico";
@@ -37,8 +38,21 @@ export function Login({ onLogin }: LoginProps) {
 
         if (!response.ok) throw new Error("Erro ao cadastrar usuário");
         
-        alert("Conta criada com sucesso! Agora faça login.");
-        setIsRegistering(false);
+        // Realiza login automático após registro bem-sucedido
+        const loginResponse = await fetch(`${API_URL}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const loginData = await loginResponse.json();
+        if (!loginResponse.ok) throw new Error(loginData.detail || "Erro ao fazer login");
+
+        localStorage.setItem("token", loginData.token);
+        // Mapeia o tipo de usuário retornado pelo backend
+        const backendRole = loginData.user_type || role;
+        const mappedRole = backendRole === 'tecnico' ? 'it-executive' : 'client';
+        onLogin(email, mappedRole, name);
       } else {
         // --- LÓGICA DE LOGIN ---
         const response = await fetch(`${API_URL}/auth/login`, {
@@ -53,9 +67,12 @@ export function Login({ onLogin }: LoginProps) {
 
         // Salva o token no localStorage para persistência
         localStorage.setItem("token", data.token);
-        // Mapeia o tipo de usuário para o formato esperado
-        const mappedRole = role === 'tecnico' ? 'it-executive' : 'client';
-        onLogin(email, mappedRole, data.token);
+        // Mapeia o tipo de usuário retornado pelo backend
+        const backendRole = data.user_type || "usuario";
+        const mappedRole = backendRole === 'tecnico' ? 'it-executive' : 'client';
+        // Extrai o nome da resposta ou usa o e-mail como fallback
+        const userName = data.name || email.split('@')[0];
+        onLogin(email, mappedRole, userName);
       }
     } catch (error: any) {
       alert(error.message);
@@ -65,81 +82,123 @@ export function Login({ onLogin }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4">
-      <div className="w-full max-w-[440px] backdrop-blur-xl bg-white/5 border border-white/10 shadow-2xl rounded-3xl p-8 z-10">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            {isRegistering ? "Criar Conta" : "TechSupport"}
-          </h1>
-          <p className="text-gray-400 text-sm">
-            {isRegistering ? "Preencha os dados abaixo" : "Entre no seu painel de suporte"}
-          </p>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Header igual ao App */}
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center h-16">
+            <div className="flex items-center gap-2">
+              <TicketIcon className="h-8 w-8 text-blue-600" />
+              <h1 className="text-xl font-semibold text-gray-900">Suporte TI</h1>
+            </div>
+          </div>
         </div>
+      </header>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {isRegistering && (
-            <input
-              type="text"
-              placeholder="Nome Completo"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full h-12 bg-white/5 border border-white/20 text-white rounded-xl px-4 focus:ring-2 focus:ring-blue-500 outline-none"
-              required
-            />
-          )}
-
-          <input
-            type="email"
-            placeholder="E-mail"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full h-12 bg-white/5 border border-white/20 text-white rounded-xl px-4 focus:ring-2 focus:ring-blue-500 outline-none"
-            required
-          />
-
-          <input
-            type="password"
-            placeholder="Senha"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full h-12 bg-white/5 border border-white/20 text-white rounded-xl px-4 focus:ring-2 focus:ring-blue-500 outline-none"
-            required
-          />
-
-          {/* Seletor de Cargo (Apenas visível no Registro para definir o tipo) */}
-          <div className="grid grid-cols-2 gap-2 py-2">
-            <button
-              type="button"
-              onClick={() => setRole("usuario")}
-              className={`p-2 rounded-lg border ${role === 'usuario' ? 'bg-blue-500 text-white' : 'text-gray-400'}`}
-            >
-              Usuário
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole("tecnico")}
-              className={`p-2 rounded-lg border ${role === 'tecnico' ? 'bg-purple-500 text-white' : 'text-gray-400'}`}
-            >
-              Analista TI
-            </button>
+      {/* Container principal */}
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+          {/* Título e descrição */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              {isRegistering ? "Criar Conta" : "Acesso ao Sistema"}
+            </h2>
+            <p className="text-gray-600 text-sm">
+              {isRegistering ? "Preencha os dados abaixo para se registrar" : "Entre com suas credenciais"}
+            </p>
           </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-bold hover:scale-[1.02] transition-transform disabled:opacity-50"
-          >
-            {isLoading ? "Processando..." : isRegistering ? "Cadastrar" : "Entrar"}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {isRegistering && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nome Completo</label>
+                <input
+                  type="text"
+                  placeholder="Digite seu nome"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full h-10 bg-gray-50 border border-gray-200 text-gray-900 rounded-md px-3 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                  required
+                />
+              </div>
+            )}
 
-        <div className="mt-6 text-center">
-          <button 
-            onClick={() => setIsRegistering(!isRegistering)}
-            className="text-sm text-blue-400 hover:underline"
-          >
-            {isRegistering ? "Já tem uma conta? Faça login" : "Não tem conta? Cadastre-se"}
-          </button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">E-mail</label>
+              <input
+                type="email"
+                placeholder="seu.email@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full h-10 bg-gray-50 border border-gray-200 text-gray-900 rounded-md px-3 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Senha</label>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full h-10 bg-gray-50 border border-gray-200 text-gray-900 rounded-md px-3 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all"
+                required
+              />
+            </div>
+
+            {/* Seletor de Cargo (visível apenas no registro) */}
+            {isRegistering && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Usuário</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRole("usuario")}
+                    className={`h-10 rounded-md border font-medium transition-all ${
+                      role === 'usuario'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    Usuário
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole("tecnico")}
+                    className={`h-10 rounded-md border font-medium transition-all ${
+                      role === 'tecnico'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    Analista TI
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-6"
+            >
+              {isLoading ? "Processando..." : isRegistering ? "Cadastrar" : "Entrar"}
+            </button>
+          </form>
+
+          {/* Link para trocar entre login e registro */}
+          <div className="mt-6 text-center border-t border-gray-200 pt-6">
+            <p className="text-gray-600 text-sm mb-2">
+              {isRegistering ? "Já tem uma conta?" : "Não tem conta?"}
+            </p>
+            <button
+              onClick={() => setIsRegistering(!isRegistering)}
+              className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
+            >
+              {isRegistering ? "Faça login aqui" : "Cadastre-se aqui"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
