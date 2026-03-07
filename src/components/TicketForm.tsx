@@ -11,17 +11,30 @@ export interface Ticket {
   assignedTo?: string;
   createdAt: Date;
   updatedAt: Date;
+  attachments?: Array<{
+    id: string;
+    url: string;
+    name: string;
+    type: string;
+  }>;
   comments: Array<{
     id: string;
     author: string;
+    authorEmail?: string;
     content: string;
     timestamp: Date;
     isInternal: boolean;
+    attachments?: Array<{
+      id: string;
+      url: string;
+      name: string;
+      type: string;
+    }>;
   }>;
 }
 
 interface TicketFormProps {
-  onSubmit: (ticket: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'>) => void;
+  onSubmit: (ticket: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'> & { files?: FileList }) => void;
   userEmail: string;
 }
 
@@ -174,6 +187,103 @@ const styles = `
   .tf-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
   .tf-submit:active { transform: translateY(0); }
 
+  /* File upload */
+  .tf-file-upload {
+    border: 1.5px dashed #d1d5db;
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    background: #fafbfc;
+    transition: all 0.2s;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .tf-file-upload:hover {
+    border-color: #6366f1;
+    background: #eef2ff;
+  }
+
+  .tf-file-upload.dragover {
+    border-color: #6366f1;
+    background: #eef2ff;
+    transform: scale(1.02);
+  }
+
+  .tf-file-upload-icon {
+    width: 32px;
+    height: 32px;
+    margin: 0 auto 12px;
+    color: #6b7280;
+  }
+
+  .tf-file-upload-text {
+    font-size: 14px;
+    color: #374151;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
+  .tf-file-upload-sub {
+    font-size: 12px;
+    color: #9ca3af;
+  }
+
+  .tf-file-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .tf-file-list {
+    margin-top: 16px;
+  }
+
+  .tf-file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+
+  .tf-file-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+
+  .tf-file-name {
+    font-size: 13px;
+    color: #374151;
+    font-weight: 500;
+  }
+
+  .tf-file-size {
+    font-size: 11px;
+    color: #9ca3af;
+  }
+
+  .tf-file-remove {
+    color: #ef4444;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 3px;
+    transition: background 0.15s;
+  }
+
+  .tf-file-remove:hover {
+    background: #fef2f2;
+  }
+
   @media (max-width: 600px) {
     .tf-row { grid-template-columns: 1fr; }
     .tf-priority-grid { grid-template-columns: repeat(2, 1fr); }
@@ -188,12 +298,85 @@ export function TicketForm({ onSubmit, userEmail }: TicketFormProps) {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [category, setCategory] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const handleFileSelect = (selectedFiles: FileList | null) => {
+    if (!selectedFiles) return;
+    
+    const newFiles = Array.from(selectedFiles);
+    const validFiles = newFiles.filter(file => {
+      // Check file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`Arquivo "${file.name}" é muito grande. Máximo 10MB.`);
+        return false;
+      }
+      return true;
+    });
+    
+    setFiles(prev => [...prev, ...validFiles]);
+  };
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    handleFileSelect(e.dataTransfer.files);
+  };
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim() || !category) return;
-    onSubmit({ title: title.trim(), description: description.trim(), priority, category, submittedBy: userEmail });
-    setTitle(''); setDescription(''); setPriority('medium'); setCategory('');
+    setIsSubmitting(true);
+    
+    // Create a FileList-like object from the files array
+    const dataTransfer = new DataTransfer();
+    files.forEach(file => dataTransfer.items.add(file));
+    
+    try {
+      await onSubmit({ 
+        title: title.trim(), 
+        description: description.trim(), 
+        priority, 
+        category, 
+        submittedBy: userEmail,
+        files: dataTransfer.files
+      });
+
+      // Reset form on success
+      setTitle(''); 
+      setDescription(''); 
+      setPriority('medium'); 
+      setCategory('');
+      setFiles([]);
+    } catch (err) {
+      // errors handled by parent
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const priorities = [
@@ -245,14 +428,77 @@ export function TicketForm({ onSubmit, userEmail }: TicketFormProps) {
               <textarea className="tf-textarea" value={description} onChange={e => setDescription(e.target.value)} placeholder="Descreva detalhadamente o que está ocorrendo, incluindo mensagens de erro, quando começou e qualquer informação relevante..." required />
             </div>
 
+            <div className="tf-field">
+              <label className="tf-label">Anexar arquivos (opcional)</label>
+              <div 
+                className={`tf-file-upload ${isDragOver ? 'dragover' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+              >
+                <svg className="tf-file-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14,2 14,8 20,8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <polyline points="10,9 9,9 8,9"/>
+                </svg>
+                <div className="tf-file-upload-text">Clique para selecionar ou arraste arquivos aqui</div>
+                <div className="tf-file-upload-sub">Máximo 10MB por arquivo</div>
+                <input 
+                  type="file" 
+                  className="tf-file-input" 
+                  multiple 
+                  accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
+                  onChange={(e) => handleFileSelect(e.target.files)}
+                />
+              </div>
+              
+              {files.length > 0 && (
+                <div className="tf-file-list">
+                  {files.map((file, index) => (
+                    <div key={index} className="tf-file-item">
+                      <div className="tf-file-info">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                          <polyline points="14,2 14,8 20,8"/>
+                        </svg>
+                        <div>
+                          <div className="tf-file-name">{file.name}</div>
+                          <div className="tf-file-size">{formatFileSize(file.size)}</div>
+                        </div>
+                      </div>
+                      <button 
+                        type="button" 
+                        className="tf-file-remove"
+                        onClick={() => removeFile(index)}
+                        title="Remover arquivo"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="18" y1="6" x2="6" y2="18"/>
+                          <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="tf-info">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0, marginTop:1}}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
               <p>Quanto mais detalhes você fornecer, mais rápido nossa equipe poderá resolver seu chamado.</p>
             </div>
 
-            <button type="submit" className="tf-submit">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              Enviar Chamado
+            <button type="submit" className="tf-submit" disabled={isSubmitting || !title.trim() || !description.trim() || !category}>
+              {isSubmitting ? (
+                <span className="spinner" />
+              ) : (
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  Enviar Chamado
+                </>
+              )}
             </button>
           </form>
         </div>

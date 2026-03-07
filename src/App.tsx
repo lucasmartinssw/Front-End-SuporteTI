@@ -5,6 +5,7 @@ import { TicketList } from './components/TicketList';
 import { TicketDetail } from './components/TicketDetail';
 import { toast } from 'sonner';
 import { Login } from './components/Login';
+import { createChamado, listChamados, getChamado, listMensagens, postMensagem } from './services/api';
 
 // ── Static weekly chart data (replace with real API data as needed) ──
 const WEEKLY_DATA = [
@@ -177,23 +178,111 @@ export default function App() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
 
+  // Restore authentication from localStorage on app load
   useEffect(() => {
-    const storedTickets = localStorage.getItem('tickets');
-    if (storedTickets) {
-      try {
-        const parsed = JSON.parse(storedTickets);
-        const ticketsWithDates = parsed.map((t: any) => ({
-          ...t,
-          createdAt: new Date(t.createdAt),
-          updatedAt: new Date(t.updatedAt),
-          comments: t.comments.map((c: any) => ({ ...c, timestamp: new Date(c.timestamp) }))
-        }));
-        setTickets(ticketsWithDates);
-      } catch { loadMockTickets(); }
-    } else {
-      loadMockTickets();
+    const token = localStorage.getItem('token');
+    const email = localStorage.getItem('userEmail');
+    const role = localStorage.getItem('userRole') as 'client' | 'it-executive' | null;
+    const name = localStorage.getItem('userName');
+
+    if (token && email && role) {
+      setUserEmail(email);
+      setUserRole(role);
+      setUserName(name || '');
+      setIsAuthenticated(true);
     }
   }, []);
+
+  useEffect(() => {
+    // Load tickets from API if authenticated
+    if (isAuthenticated) {
+      loadTicketsFromAPI();
+    } else {
+      // Load from localStorage as fallback for non-authenticated state
+      const storedTickets = localStorage.getItem('tickets');
+      if (storedTickets) {
+        try {
+          const parsed = JSON.parse(storedTickets);
+          const ticketsWithDates = parsed.map((t: any) => ({
+            ...t,
+            createdAt: new Date(t.createdAt),
+            updatedAt: new Date(t.updatedAt),
+            comments: t.comments.map((c: any) => ({ ...c, timestamp: new Date(c.timestamp) }))
+          }));
+          setTickets(ticketsWithDates);
+        } catch { loadMockTickets(); }
+      } else {
+        loadMockTickets();
+      }
+    }
+  }, [isAuthenticated]);
+
+  // Polling: Refresh comments every 8 seconds when viewing ticket detail
+  useEffect(() => {
+    if (activeView !== 'detail' || !selectedTicket) return;
+
+    const pollingInterval = setInterval(async () => {
+      try {
+        const msgs = await listMensagens(selectedTicket.id);
+        const mappedComments = msgs.map((m: any) => {
+          const authorName = m.author_name || m.author_email || 'Usuário desconhecido';
+          return {
+            id: String(m.id),
+            author: authorName,
+            authorEmail: m.author_email || '',
+            content: m.mensagem,
+            timestamp: new Date(m.enviado_em),
+            isInternal: !!m.is_internal,
+            attachments: m.attachments || []
+          };
+        });
+
+        // Update selectedTicket with new comments
+        setSelectedTicket(prev =>
+          prev ? { ...prev, comments: mappedComments } : null
+        );
+      } catch (error) {
+        // Silently fail on polling errors (don't spam toasts)
+        console.debug('Polling error:', error);
+      }
+    }, 8000); // Poll every 8 seconds
+
+    return () => clearInterval(pollingInterval);
+  }, [activeView, selectedTicket?.id]);
+
+  const loadTicketsFromAPI = async () => {
+    try {
+      const data = await listChamados();
+      const ticketsWithDates = data.map((t: any) => ({
+        id: String(t.id),
+        title: t.titulo,
+        description: t.descricao,
+        priority: getPriorityFromId(t.prioridade_id),
+        category: t.categoria || 'Geral',
+        status: getStatusFromId(t.status_id),
+        submittedBy: (t.user_email || '').toLowerCase().trim(),
+        createdAt: new Date(t.created_at),
+        updatedAt: new Date(t.updated_at || t.created_at),
+        attachments: t.attachments || [],
+        comments: [] // Comments will be fetched when a ticket is opened
+      }));
+      setTickets(ticketsWithDates);
+    } catch (error: any) {
+      console.error('Erro ao carregar chamados:', error);
+      toast.error('Erro ao carregar chamados');
+      loadMockTickets(); // Fallback to mock data
+    }
+  };
+
+  const getPriorityFromId = (id: number): Ticket['priority'] => {
+    const map: Record<number, Ticket['priority']> = { 1: 'low', 2: 'medium', 3: 'high', 4: 'urgent' };
+    return map[id] || 'medium';
+  };
+
+  const getStatusFromId = (id: number): Ticket['status'] => {
+    const map: Record<number, Ticket['status']> = { 1: 'open', 2: 'in-progress', 3: 'resolved', 4: 'closed' };
+    return map[id] || 'open';
+  };
 
   const loadMockTickets = () => {
     const mockTickets: Ticket[] = [
@@ -205,16 +294,40 @@ export default function App() {
   };
 
   if (!isAuthenticated) {
-    return <Login onLogin={(email, role, name) => { setUserEmail(email); setUserRole(role as any); setUserName(name); setIsAuthenticated(true); }} />;
+    return <Login onLogin={(email, role, name) => { setUserEmail(email); setUserRole(role as any); setUserName(name); setIsAuthenticated(true); localStorage.setItem('userEmail', email); localStorage.setItem('userRole', role); localStorage.setItem('userName', name); }} />;
   }
 
-  const handleSubmitTicket = (ticketData: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'>) => {
-    const newTicket: Ticket = { ...ticketData, id: Date.now().toString(), status: 'open', createdAt: new Date(), updatedAt: new Date(), comments: [] };
-    const updated = [newTicket, ...tickets];
-    setTickets(updated);
-    localStorage.setItem('tickets', JSON.stringify(updated));
-    setActiveView('tickets');
-    toast.success('Chamado enviado com sucesso!');
+  const handleSubmitTicket = async (ticketData: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'> & { files?: FileList }) => {
+    try {
+      // Send to backend API
+      const response = await createChamado({
+        title: ticketData.title,
+        description: ticketData.description,
+        priority: ticketData.priority,
+        category: ticketData.category,
+        files: ticketData.files,
+      });
+
+      // Create local ticket object with backend response
+      const newTicket: Ticket = {
+        ...ticketData,
+        id: response.id,
+        status: 'open',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        comments: [],
+      };
+      
+      // Update local state
+      const updated = [newTicket, ...tickets];
+      setTickets(updated);
+      localStorage.setItem('tickets', JSON.stringify(updated));
+      setActiveView('tickets');
+      toast.success('Chamado enviado com sucesso!');
+    } catch (error: any) {
+      console.error('Erro ao enviar chamado:', error);
+      toast.error(error.message || 'Erro ao enviar chamado');
+    }
   };
 
   const handleStatusUpdate = (ticketId: string, status: Ticket['status']) => {
@@ -233,16 +346,85 @@ export default function App() {
     toast.success('Chamado designado');
   };
 
-  const handleAddComment = (ticketId: string, comment: string, isInternal: boolean) => {
-    const newComment = { id: Date.now().toString(), author: userEmail, content: comment, timestamp: new Date(), isInternal };
-    const updated = tickets.map(t => t.id === ticketId ? { ...t, comments: [...t.comments, newComment], updatedAt: new Date() } : t);
-    setTickets(updated);
-    localStorage.setItem('tickets', JSON.stringify(updated));
-    if (selectedTicket?.id === ticketId) setSelectedTicket(prev => prev ? { ...prev, comments: [...prev.comments, newComment], updatedAt: new Date() } : null);
-    toast.success('Comentário adicionado!');
+  const handleAddComment = async (ticketId: string, comment: string, isInternal: boolean, files?: File[]) => {
+    try {
+      await postMensagem(ticketId, comment, isInternal, files);
+      // reload messages from API
+      const msgs = await listMensagens(ticketId);
+      const mapped = msgs.map((m: any) => {
+        const authorEmail = m.author_email || 'unknown@company.com';
+        return {
+          id: String(m.id),
+          author: authorEmail,
+          content: m.mensagem,
+          timestamp: new Date(m.enviado_em),
+          isInternal: !!m.is_internal,
+          attachments: m.attachments || []
+        };
+      });
+
+      const updatedTickets = tickets.map(t =>
+        t.id === ticketId ? { ...t, comments: mapped, updatedAt: new Date() } : t
+      );
+      setTickets(updatedTickets);
+      localStorage.setItem('tickets', JSON.stringify(updatedTickets));
+      if (selectedTicket?.id === ticketId) {
+        setSelectedTicket(prev => prev ? { ...prev, comments: mapped, updatedAt: new Date() } : null);
+      }
+      toast.success('Comentário enviado!');
+    } catch (err: any) {
+      console.error('Erro ao enviar comentário:', err);
+      toast.error(err.message || 'Erro ao enviar comentário');
+    }
   };
 
-  const handleTicketSelect = (ticket: Ticket) => { setSelectedTicket(ticket); setActiveView('detail'); };
+  const handleTicketSelect = async (ticket: Ticket) => {
+    try {
+      // Load full ticket details from API (includes attachments)
+      const fullTicket = await getChamado(ticket.id);
+      // Load messages separately
+      const msgs = await listMensagens(ticket.id);
+
+      // Transform messages into comments
+      const mappedComments = msgs.map((m: any) => {
+        const authorName = m.author_name || m.author_email || 'Usuário desconhecido';
+        return {
+          id: String(m.id),
+          author: authorName,
+          authorEmail: m.author_email || '',
+          content: m.mensagem,
+          timestamp: new Date(m.enviado_em),
+          isInternal: !!m.is_internal,
+          attachments: m.attachments || []
+        };
+      });
+
+      // Transform API response to Ticket type
+      const transformedTicket: Ticket = {
+        id: String(fullTicket.id),
+        title: fullTicket.titulo,
+        description: fullTicket.descricao,
+        priority: getPriorityFromId(fullTicket.prioridade_id),
+        category: fullTicket.categoria || 'Geral',
+        status: getStatusFromId(fullTicket.status_id),
+        submittedBy: ticket.submittedBy || 'unknown@company.com',
+        assignedTo: ticket.assignedTo,
+        createdAt: new Date(fullTicket.created_at),
+        updatedAt: new Date(fullTicket.updated_at || fullTicket.created_at),
+        attachments: fullTicket.attachments || [],
+        comments: mappedComments
+      };
+
+      setSelectedTicket(transformedTicket);
+      setActiveView('detail');
+    } catch (error: any) {
+      console.error('Erro ao carregar chamado:', error);
+      // Fallback: use the ticket passed in props
+      setSelectedTicket(ticket);
+      setActiveView('detail');
+      toast.error('Erro ao carregar detalhes completos do chamado');
+    }
+  };
 
   // ── Helpers ──────────────────────────────────────────
   const statusLabel = (s: string) => ({ open: 'Aberto', 'in-progress': 'Em Progresso', resolved: 'Resolvido', closed: 'Fechado' }[s] || s);
@@ -261,7 +443,8 @@ export default function App() {
   };
 
   // ── CLIENT dashboard — scoped to userEmail ───────────
-  const myTickets = tickets.filter(t => t.submittedBy === userEmail);
+  const normalizedUserEmail = userEmail.toLowerCase().trim();
+  const myTickets = tickets.filter(t => (t.submittedBy || '').toLowerCase().trim() === normalizedUserEmail);
   const myStats = {
     total: myTickets.length,
     open: myTickets.filter(t => t.status === 'open').length,

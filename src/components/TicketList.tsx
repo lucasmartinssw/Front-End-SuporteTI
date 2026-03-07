@@ -286,7 +286,10 @@ export function TicketList({ tickets, userRole, userEmail, onTicketSelect, onSta
   const itExecutives = ['john.doe@company.com', 'jane.smith@company.com', 'mike.wilson@company.com'];
 
   const filteredTickets = tickets.filter(ticket => {
-    if (userRole === 'client' && ticket.submittedBy !== userEmail) return false;
+    if (
+      userRole === 'client' &&
+      (ticket.submittedBy || '').toLowerCase().trim() !== userEmail.toLowerCase().trim()
+    ) return false;
     if (searchTerm && !ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) && !ticket.description.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     if (statusFilter !== 'all' && ticket.status !== statusFilter) return false;
     if (priorityFilter !== 'all' && ticket.priority !== priorityFilter) return false;

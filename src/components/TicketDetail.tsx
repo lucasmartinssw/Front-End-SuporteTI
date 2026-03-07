@@ -6,7 +6,7 @@ interface TicketDetailProps {
   userRole: 'client' | 'it-executive';
   userEmail: string;
   onBack: () => void;
-  onAddComment: (ticketId: string, comment: string, isInternal: boolean) => void;
+  onAddComment: (ticketId: string, comment: string, isInternal: boolean, files?: File[]) => void;
   onStatusUpdate: (ticketId: string, status: Ticket['status']) => void;
   onAssignTicket: (ticketId: string, assignee: string) => void;
 }
@@ -232,6 +232,16 @@ const styles = `
   .td-btn-send:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(99,102,241,0.35); }
   .td-btn-send:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
 
+  /* spinner reused from ticket form */
+  .td-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #fff;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
   /* Sidebar */
   .td-sidebar {}
 
@@ -274,6 +284,51 @@ const styles = `
 
   .td-select:focus { border-color: #6366f1; background-color: #fff; box-shadow: 0 0 0 3px rgba(99,102,241,0.08); }
 
+  /* Attachments section */
+  .td-attachments-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .td-attachment-item {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f0f1f5;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid #e5e7eb;
+  }
+
+  .td-attachment-item:hover {
+    transform: scale(1.03);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .td-attachment-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .td-attachment-icon {
+    font-size: 32px;
+  }
+
+  .td-attachment-label {
+    font-size: 11px;
+    color: #9ca3af;
+    text-align: center;
+    padding: 8px;
+    font-weight: 500;
+  }
+
   /* Urgent help card */
   .td-urgent-card {
     background: #f0f4ff;
@@ -297,6 +352,8 @@ const itExecutives = ['john.doe@company.com', 'jane.smith@company.com', 'mike.wi
 export function TicketDetail({ ticket, userRole, userEmail, onBack, onAddComment, onStatusUpdate, onAssignTicket }: TicketDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
+  const [commentFiles, setCommentFiles] = useState<File[]>([]);
+  const [isSending, setIsSending] = useState(false);
 
   const formatDate = (d: Date) => new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
 
@@ -309,11 +366,19 @@ export function TicketDetail({ ticket, userRole, userEmail, onBack, onAddComment
 
   const visibleComments = ticket.comments.filter(c => userRole === 'it-executive' || !c.isInternal);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!newComment.trim()) return;
-    onAddComment(ticket.id, newComment.trim(), isInternal);
-    setNewComment('');
-    setIsInternal(false);
+    setIsSending(true);
+    try {
+      await onAddComment(ticket.id, newComment.trim(), isInternal, commentFiles.length ? commentFiles : undefined);
+      setNewComment('');
+      setIsInternal(false);
+      setCommentFiles([]);
+    } catch (err) {
+      // parent handles toast
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
@@ -349,6 +414,39 @@ export function TicketDetail({ ticket, userRole, userEmail, onBack, onAddComment
               </div>
             </div>
 
+            {ticket.attachments && ticket.attachments.length > 0 && (
+              <div className="td-card">
+                <div className="td-card-header">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span className="td-card-title">Anexos</span>
+                  <span style={{marginLeft:'auto', fontSize:'12px', color:'#9ca3af'}}>{ticket.attachments.length} arquivo(s)</span>
+                </div>
+                <div className="td-card-body">
+                  <div className="td-attachments-grid">
+                    {ticket.attachments.map((attachment, idx) => (
+                      <a
+                        key={idx}
+                        href={attachment.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="td-attachment-item"
+                        title={attachment.name}
+                      >
+                        {attachment.type.startsWith('image/') ? (
+                          <img src={attachment.url} alt={attachment.name} className="td-attachment-image" />
+                        ) : (
+                          <div style={{ textAlign: 'center' }}>
+                            <div className="td-attachment-icon">📄</div>
+                            <div className="td-attachment-label">{attachment.name.split('.').pop()?.toUpperCase()}</div>
+                          </div>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="td-card">
               <div className="td-card-header">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -361,7 +459,7 @@ export function TicketDetail({ ticket, userRole, userEmail, onBack, onAddComment
                 ) : (
                   <div className="td-comment-list">
                     {visibleComments.map(comment => {
-                      const isMe = comment.author === userEmail;
+                      const isMe = (comment.authorEmail || '').toLowerCase().trim() === (userEmail || '').toLowerCase().trim();
                       return (
                         <div key={comment.id} className="td-comment">
                           <div className={`td-avatar ${isMe ? 'td-avatar-me' : 'td-avatar-other'}`}>
@@ -374,6 +472,29 @@ export function TicketDetail({ ticket, userRole, userEmail, onBack, onAddComment
                               <span className="td-comment-time">{formatDate(comment.timestamp)}</span>
                             </div>
                             <p className="td-comment-text">{comment.content}</p>
+                            {comment.attachments && comment.attachments.length > 0 && (
+                              <div className="td-attachments-grid" style={{ marginTop: '8px' }}>
+                                {comment.attachments.map((attachment, idx) => (
+                                  <a
+                                    key={idx}
+                                    href={attachment.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="td-attachment-item"
+                                    title={attachment.name}
+                                  >
+                                    {attachment.type.startsWith('image/') ? (
+                                      <img src={attachment.url} alt={attachment.name} className="td-attachment-image" />
+                                    ) : (
+                                      <div style={{ textAlign: 'center' }}>
+                                        <div className="td-attachment-icon">📄</div>
+                                        <div className="td-attachment-label">{attachment.name.split('.').pop()?.toUpperCase()}</div>
+                                      </div>
+                                    )}
+                                  </a>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
@@ -390,6 +511,27 @@ export function TicketDetail({ ticket, userRole, userEmail, onBack, onAddComment
                     rows={3}
                     onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSend(); }}
                   />
+                  {/* attachments input */}
+                  <div style={{ marginTop: '8px' }}>
+                    <input
+                      type="file"
+                      multiple
+                      onChange={e => {
+                        const files = e.target.files;
+                        if (files) setCommentFiles(prev => [...prev, ...Array.from(files)]);
+                      }}
+                    />
+                    {commentFiles.length > 0 && (
+                      <div style={{ marginTop: '6px' }}>
+                        {commentFiles.map((f, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                            📎 {f.name}
+                            <button type="button" onClick={() => setCommentFiles(prev => prev.filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', cursor: 'pointer' }} title="Remover arquivo">✖️</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div className="td-comment-actions">
                     {userRole === 'it-executive' ? (
                       <label className="td-internal-toggle">
@@ -397,9 +539,15 @@ export function TicketDetail({ ticket, userRole, userEmail, onBack, onAddComment
                         Comentário interno (só visível para o TI)
                       </label>
                     ) : <div />}
-                    <button className="td-btn-send" onClick={handleSend} disabled={!newComment.trim()}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                      Comentar
+                    <button className="td-btn-send" onClick={handleSend} disabled={!newComment.trim() || isSending}>
+                      {isSending ? (
+                        <span className="td-spinner" />
+                      ) : (
+                        <>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                          Comentar
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>

@@ -36,7 +36,7 @@ export function Login({ onLogin }: LoginProps) {
         if (!loginResponse.ok) throw new Error(loginData.detail || "Erro ao fazer login");
         localStorage.setItem("token", loginData.token);
         const mappedRole = (loginData.user_type || role) === 'tecnico' ? 'it-executive' : 'client';
-        onLogin(email, mappedRole, name);
+        onLogin(email.toLowerCase().trim(), mappedRole, name);
       } else {
         const response = await fetch(`${API_URL}/auth/login`, {
           method: "POST",
@@ -48,7 +48,7 @@ export function Login({ onLogin }: LoginProps) {
         localStorage.setItem("token", data.token);
         const mappedRole = (data.user_type || "usuario") === 'tecnico' ? 'it-executive' : 'client';
         const userName = data.name || email.split('@')[0];
-        onLogin(email, mappedRole, userName);
+        onLogin(email.toLowerCase().trim(), mappedRole, userName);
       }
     } catch (error: any) {
       alert(error.message);
