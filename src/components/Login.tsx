@@ -20,6 +20,21 @@ export function Login({ onLogin }: LoginProps) {
     e.preventDefault();
     setIsLoading(true);
     try {
+      // Temporário: Bypass do backend para desenvolvimento
+      // Remover quando o backend estiver funcionando
+      console.log("Modo desenvolvimento: Login sem backend");
+
+      // Simular token mock
+      localStorage.setItem("token", "mock-token-dev");
+
+      // Mapear role baseado na seleção
+      const mappedRole = role === 'tecnico' ? 'it-executive' : 'client';
+      const userName = name || email.split('@')[0];
+
+      onLogin(email.toLowerCase().trim(), mappedRole, userName);
+
+      /*
+      // Código original comentado - descomente quando backend estiver pronto
       if (isRegistering) {
         const response = await fetch(`${API_URL}/auth/register`, {
           method: "POST",
@@ -50,6 +65,7 @@ export function Login({ onLogin }: LoginProps) {
         const userName = data.name || email.split('@')[0];
         onLogin(email.toLowerCase().trim(), mappedRole, userName);
       }
+      */
     } catch (error: any) {
       alert(error.message);
     } finally {
@@ -392,8 +408,8 @@ export function Login({ onLogin }: LoginProps) {
           <div className="panel-logo">
             <div className="panel-logo-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
               </svg>
             </div>
             <span className="panel-logo-text">Suporte TI</span>
