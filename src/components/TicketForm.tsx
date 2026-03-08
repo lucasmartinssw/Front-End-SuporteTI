@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+// Interfaces mantidas idênticas
 export interface Ticket {
   id: string;
   title: string;
@@ -11,12 +12,7 @@ export interface Ticket {
   assignedTo?: string;
   createdAt: Date;
   updatedAt: Date;
-  attachments?: Array<{
-    id: string;
-    url: string;
-    name: string;
-    type: string;
-  }>;
+  attachments?: Array<{ id: string; url: string; name: string; type: string }>;
   comments: Array<{
     id: string;
     author: string;
@@ -24,12 +20,7 @@ export interface Ticket {
     content: string;
     timestamp: Date;
     isInternal: boolean;
-    attachments?: Array<{
-      id: string;
-      url: string;
-      name: string;
-      type: string;
-    }>;
+    attachments?: Array<{ id: string; url: string; name: string; type: string }>;
   }>;
 }
 
@@ -39,257 +30,184 @@ interface TicketFormProps {
 }
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=DM+Sans:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&display=swap');
 
-  /* NOVO: Container para centralizar a tela */
   .tf-container {
     display: flex;
     justify-content: center;
-    align-items: center;
+    padding: 40px 20px;
+    background-color: #f8fafc;
     min-height: 100vh;
-    padding: 20px;
-    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
   }
 
   .tf-wrap {
     width: 100%;
-    max-width: 640px;
-    animation: fadeUp 0.3s ease both;
+    max-width: 700px;
+    animation: tf-fadeUp 0.4s ease-out;
   }
 
-  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes tf-fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 
-  .tf-heading { margin-bottom: 28px; }
-
+  .tf-header { margin-bottom: 32px; text-align: left; }
+  
   .tf-title {
     font-family: 'Sora', sans-serif;
-    font-size: 22px;
+    font-size: 28px;
     font-weight: 700;
-    color: #0f1117;
-    letter-spacing: -0.4px;
-    margin-bottom: 4px;
+    color: #1e293b;
+    margin: 0 0 8px 0;
+    letter-spacing: -0.02em;
   }
 
-  .tf-sub { font-size: 13.5px; color: #9ca3af; }
+  .tf-sub { color: #64748b; font-size: 15px; margin: 0; }
 
   .tf-card {
-    background: #fff;
-    border: 1px solid #f0f1f5;
-    border-radius: 16px;
-    padding: 32px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.03); /* Adicionado um leve sombreamento para destacar */
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 40px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
   }
 
-  .tf-field { margin-bottom: 22px; }
-
+  .tf-group { margin-bottom: 24px; }
+  
   .tf-label {
     display: block;
-    font-size: 13px;
-    font-weight: 500;
-    color: #374151;
+    font-size: 14px;
+    font-weight: 600;
+    color: #334155;
     margin-bottom: 8px;
-    letter-spacing: 0.1px;
   }
 
-  .tf-label span { color: #6366f1; margin-left: 2px; }
+  .tf-label span { color: #ef4444; margin-left: 4px; }
 
   .tf-input, .tf-select, .tf-textarea {
     width: 100%;
-    padding: 11px 14px;
-    border: 1.5px solid #e5e7eb;
-    border-radius: 10px;
-    font-size: 14px;
-    font-family: 'DM Sans', sans-serif;
-    color: #111827;
-    background: #fafbfc;
-    outline: none;
-    transition: all 0.2s;
+    padding: 12px 16px;
+    background: #fdfdfd;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 15px;
+    color: #1e293b;
+    transition: all 0.2s ease;
     box-sizing: border-box;
   }
 
-  .tf-input::placeholder, .tf-textarea::placeholder { color: #c4c9d4; }
-
   .tf-input:focus, .tf-select:focus, .tf-textarea:focus {
+    outline: none;
     border-color: #6366f1;
     background: #fff;
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
   }
 
-  .tf-textarea { resize: vertical; min-height: 130px; line-height: 1.6; }
+  .tf-textarea { min-height: 120px; resize: vertical; line-height: 1.6; }
 
-  .tf-select {
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
-    padding-right: 36px;
-    cursor: pointer;
+  .tf-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
   }
 
-  .tf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-
-  /* Priority selector */
-  .tf-priority-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-
-  .tf-priority-btn {
-    height: 40px;
-    border-radius: 9px;
-    border: 1.5px solid #e5e7eb;
-    background: #fafbfc;
-    font-size: 12.5px;
-    font-weight: 500;
-    font-family: 'DM Sans', sans-serif;
-    cursor: pointer;
-    transition: all 0.18s;
+  /* Priority Selector Modificado */
+  .tf-priority-nav {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    color: #6b7280;
-  }
-
-  .tf-priority-btn:hover { border-color: #c7d2fe; }
-
-  .tf-priority-btn.p-low.active { background: #f0fdf4; border-color: #86efac; color: #166534; }
-  .tf-priority-btn.p-medium.active { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
-  .tf-priority-btn.p-high.active { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
-  .tf-priority-btn.p-urgent.active { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
-
-  .tf-priority-dot { width: 7px; height: 7px; border-radius: 50%; }
-  .p-low .tf-priority-dot { background: #22c55e; }
-  .p-medium .tf-priority-dot { background: #f59e0b; }
-  .p-high .tf-priority-dot { background: #f97316; }
-  .p-urgent .tf-priority-dot { background: #ef4444; }
-
-  /* Info box */
-  .tf-info {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 12px 14px;
-    background: #f0f4ff;
-    border: 1px solid #c7d2fe;
+    background: #f1f5f9;
+    padding: 4px;
     border-radius: 10px;
-    margin-bottom: 22px;
+    gap: 4px;
   }
 
-  .tf-info p { font-size: 13px; color: #3730a3; line-height: 1.5; }
-
-  /* Submit */
-  .tf-submit {
-    width: 100%;
-    height: 46px;
-    background: linear-gradient(135deg, #4f46e5, #6366f1);
-    color: #fff;
+  .tf-priority-opt {
+    flex: 1;
+    padding: 8px;
     border: none;
-    border-radius: 10px;
-    font-size: 14px;
+    border-radius: 7px;
+    font-size: 13px;
     font-weight: 600;
-    font-family: 'DM Sans', sans-serif;
     cursor: pointer;
     transition: all 0.2s;
-    letter-spacing: 0.2px;
-    box-shadow: 0 4px 14px rgba(99,102,241,0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+    background: transparent;
+    color: #64748b;
   }
 
-  .tf-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
-  .tf-submit:active:not(:disabled) { transform: translateY(0); }
-  .tf-submit:disabled { opacity: 0.7; cursor: not-allowed; }
+  .tf-priority-opt.active.low { background: #fff; color: #16a34a; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  .tf-priority-opt.active.medium { background: #fff; color: #d97706; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  .tf-priority-opt.active.high { background: #fff; color: #ea580c; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+  .tf-priority-opt.active.urgent { background: #fff; color: #dc2626; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
 
-  /* File upload */
-  .tf-file-upload {
-    border: 1.5px dashed #d1d5db;
-    border-radius: 10px;
-    padding: 20px;
+  /* Dropzone Estilizada */
+  .tf-dropzone {
+    border: 2px dashed #cbd5e1;
+    border-radius: 14px;
+    padding: 24px;
     text-align: center;
-    background: #fafbfc;
+    background: #f8fafc;
     transition: all 0.2s;
     cursor: pointer;
     position: relative;
   }
 
-  .tf-file-upload:hover {
+  .tf-dropzone:hover, .tf-dropzone.dragover {
     border-color: #6366f1;
-    background: #eef2ff;
+    background: #f5f3ff;
   }
 
-  .tf-file-upload.dragover {
-    border-color: #6366f1;
-    background: #eef2ff;
-    transform: scale(1.02);
-  }
+  .tf-drop-icon { color: #94a3b8; margin-bottom: 8px; }
 
-  .tf-file-upload-icon {
-    width: 32px;
-    height: 32px;
-    margin: 0 auto 12px;
-    color: #6b7280;
-  }
-
-  .tf-file-upload-text {
-    font-size: 14px;
-    color: #374151;
-    font-weight: 500;
-    margin-bottom: 4px;
-  }
-
-  .tf-file-upload-sub {
-    font-size: 12px;
-    color: #9ca3af;
-  }
-
-  .tf-file-input {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0;
-    cursor: pointer;
-  }
-
-  .tf-file-list { margin-top: 16px; }
-
-  .tf-file-item {
+  .tf-file-badge {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    background: #fff;
+    border: 1px solid #e2e8f0;
     padding: 8px 12px;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    border-radius: 6px;
-    margin-bottom: 8px;
+    border-radius: 8px;
+    margin-top: 8px;
+    font-size: 13px;
   }
 
-  .tf-file-info { display: flex; align-items: center; gap: 8px; flex: 1; }
-  .tf-file-name { font-size: 13px; color: #374151; font-weight: 500; }
-  .tf-file-size { font-size: 11px; color: #9ca3af; }
-  
-  .tf-file-remove {
-    color: #ef4444;
-    cursor: pointer;
-    padding: 2px;
-    border-radius: 3px;
-    transition: background 0.15s;
-    background: none;
+  .tf-btn-submit {
+    width: 100%;
+    padding: 14px;
+    background: #6366f1;
+    color: white;
     border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 10px;
   }
-  .tf-file-remove:hover { background: #fef2f2; }
 
-  @media (max-width: 600px) {
-    .tf-row { grid-template-columns: 1fr; }
-    .tf-priority-grid { grid-template-columns: repeat(2, 1fr); }
-    .tf-card { padding: 20px; }
+  .tf-btn-submit:hover:not(:disabled) { background: #4f46e5; transform: translateY(-1px); }
+  .tf-btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  @media (max-width: 640px) {
+    .tf-grid-2 { grid-template-columns: 1fr; }
+    .tf-card { padding: 24px; }
+  }
+
+  @keyframes tf-spin { to { transform: rotate(360deg); } }
+  .tf-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: tf-spin 0.8s linear infinite;
   }
 `;
 
 const categories = ['Solicitar Ativo', 'Hardware', 'Software', 'Conexão com Internet', 'Acessos', 'Sistemas', 'Segurança', 'Impressora', 'Telefone/Celular', 'Outros'];
-
-// NOVO: Lista de ativos disponíveis
 const assetOptions = ['Notebook', 'Monitor', 'Teclado', 'Mouse', 'Cadeira Ergonômica', 'Headset', 'Celular Corporativo', 'Outro'];
 
 export function TicketForm({ onSubmit, userEmail }: TicketFormProps) {
@@ -297,8 +215,7 @@ export function TicketForm({ onSubmit, userEmail }: TicketFormProps) {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [category, setCategory] = useState('');
-  // NOVO: Estado para armazenar o ativo selecionado
-  const [asset, setAsset] = useState(''); 
+  const [asset, setAsset] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -306,233 +223,169 @@ export function TicketForm({ onSubmit, userEmail }: TicketFormProps) {
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
   const handleFileSelect = (selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
-    
-    const newFiles = Array.from(selectedFiles);
-    const validFiles = newFiles.filter(file => {
+    const newFiles = Array.from(selectedFiles).filter(file => {
       if (file.size > 10 * 1024 * 1024) {
-        alert(`Arquivo "${file.name}" é muito grande. Máximo 10MB.`);
+        alert(`O arquivo ${file.name} excede 10MB.`);
         return false;
       }
       return true;
     });
-    
-    setFiles(prev => [...prev, ...validFiles]);
-  };
-
-  const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    handleFileSelect(e.dataTransfer.files);
+    setFiles(prev => [...prev, ...newFiles]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validação extra caso seja solicitação de ativo
     if (!title.trim() || !description.trim() || !category || (category === 'Solicitar Ativo' && !asset)) return;
-    
+
     setIsSubmitting(true);
-    
     const dataTransfer = new DataTransfer();
-    files.forEach(file => dataTransfer.items.add(file));
-    
-    // NOVO: Adiciona o ativo solicitado no início da descrição
-    const finalDescription = category === 'Solicitar Ativo' && asset 
+    files.forEach(f => dataTransfer.items.add(f));
+
+    const finalDescription = category === 'Solicitar Ativo' 
       ? `[Ativo Solicitado: ${asset}]\n\n${description.trim()}`
       : description.trim();
 
     try {
-      await onSubmit({ 
-        title: title.trim(), 
-        description: finalDescription, 
-        priority, 
-        category, 
+      await onSubmit({
+        title: title.trim(),
+        description: finalDescription,
+        priority,
+        category,
         submittedBy: userEmail,
         files: dataTransfer.files
       });
-
-      // Reset form on success
-      setTitle(''); 
-      setDescription(''); 
-      setPriority('medium'); 
-      setCategory('');
-      setAsset(''); // Limpar ativo
-      setFiles([]);
-    } catch (err) {
-      // errors handled by parent
+      // Reset
+      setTitle(''); setDescription(''); setCategory(''); setAsset(''); setFiles([]);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const priorities = [
-    { value: 'low', label: 'Baixo', cls: 'p-low' },
-    { value: 'medium', label: 'Médio', cls: 'p-medium' },
-    { value: 'high', label: 'Alto', cls: 'p-high' },
-    { value: 'urgent', label: 'Urgente', cls: 'p-urgent' },
-  ] as const;
-
   return (
-    <>
+    <div className="tf-container">
       <style>{styles}</style>
-      {/* NOVO: Div wrapper tf-container para centralizar o formulário */}
-      <div className="tf-container">
-        <div className="tf-wrap">
-          <div className="tf-heading">
-            <h1 className="tf-title">Novo Chamado</h1>
-            <p className="tf-sub">Preencha os dados abaixo para abrir um chamado com a equipe de TI</p>
-          </div>
+      <div className="tf-wrap">
+        <header className="tf-header">
+          <h1 className="tf-title">Novo Chamado</h1>
+          <p className="tf-sub">Suporte técnico e solicitações de TI</p>
+        </header>
 
-          <div className="tf-card">
-            <form onSubmit={handleSubmit}>
-              <div className="tf-field">
-                <label className="tf-label">Breve Descrição <span>*</span></label>
-                <input className="tf-input" type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Descreva brevemente o problema ou solicitação" required />
-              </div>
+        <div className="tf-card">
+          <form onSubmit={handleSubmit}>
+            <div className="tf-group">
+              <label className="tf-label">O que está acontecendo? <span>*</span></label>
+              <input 
+                className="tf-input" 
+                placeholder="Ex: Minha impressora não está ligando"
+                value={title} 
+                onChange={e => setTitle(e.target.value)} 
+                required 
+              />
+            </div>
 
-              <div className="tf-row tf-field">
-                <div>
-                  <label className="tf-label">Categoria <span>*</span></label>
-                  <select 
-                    className="tf-select" 
-                    value={category} 
-                    onChange={e => {
-                      setCategory(e.target.value);
-                      if (e.target.value !== 'Solicitar Ativo') setAsset(''); // Limpa o ativo se mudar de categoria
-                    }} 
-                    required
-                  >
-                    <option value="">Selecione a categoria</option>
-                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="tf-label">Prioridade <span>*</span></label>
-                  <div className="tf-priority-grid">
-                    {priorities.map(p => (
-                      <button key={p.value} type="button" className={`tf-priority-btn ${p.cls} ${priority === p.value ? 'active' : ''}`} onClick={() => setPriority(p.value)}>
-                        <span className="tf-priority-dot" />
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* NOVO: Renderização condicional para Solicitação de Ativo */}
-              {category === 'Solicitar Ativo' && (
-                <div className="tf-field" style={{ animation: 'fadeUp 0.3s ease both' }}>
-                  <label className="tf-label">Qual ativo você deseja solicitar? <span>*</span></label>
-                  <select className="tf-select" value={asset} onChange={e => setAsset(e.target.value)} required>
-                    <option value="">Selecione um ativo</option>
-                    {assetOptions.map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
-              )}
-
-              <div className="tf-field">
-                <label className="tf-label">Descrição detalhada <span>*</span></label>
-                <textarea className="tf-textarea" value={description} onChange={e => setDescription(e.target.value)} placeholder={category === 'Solicitar Ativo' ? "Justifique a necessidade deste ativo e detalhe especificações (ex: tamanho, modelo, etc)..." : "Descreva detalhadamente o que está ocorrendo, incluindo mensagens de erro, quando começou e qualquer informação relevante..."} required />
-              </div>
-
-              <div className="tf-field">
-                <label className="tf-label">Anexar arquivos (opcional)</label>
-                <div 
-                  className={`tf-file-upload ${isDragOver ? 'dragover' : ''}`}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
+            <div className="tf-grid-2 tf-group">
+              <div>
+                <label className="tf-label">Categoria <span>*</span></label>
+                <select 
+                  className="tf-select" 
+                  value={category} 
+                  onChange={e => {
+                    setCategory(e.target.value);
+                    if (e.target.value !== 'Solicitar Ativo') setAsset('');
+                  }}
+                  required
                 >
-                  <svg className="tf-file-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                    <polyline points="14,2 14,8 20,8"/>
-                    <line x1="16" y1="13" x2="8" y2="13"/>
-                    <line x1="16" y1="17" x2="8" y2="17"/>
-                    <polyline points="10,9 9,9 8,9"/>
-                  </svg>
-                  <div className="tf-file-upload-text">Clique para selecionar ou arraste arquivos aqui</div>
-                  <div className="tf-file-upload-sub">Máximo 10MB por arquivo</div>
-                  <input 
-                    type="file" 
-                    className="tf-file-input" 
-                    multiple 
-                    accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
-                    onChange={(e) => handleFileSelect(e.target.files)}
-                  />
+                  <option value="">Selecione...</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="tf-label">Prioridade <span>*</span></label>
+                <div className="tf-priority-nav">
+                  {(['low', 'medium', 'high', 'urgent'] as const).map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      className={`tf-priority-opt ${p} ${priority === p ? 'active' : ''}`}
+                      onClick={() => setPriority(p)}
+                    >
+                      {p === 'low' ? 'Baixa' : p === 'medium' ? 'Média' : p === 'high' ? 'Alta' : 'Urgente'}
+                    </button>
+                  ))}
                 </div>
-                
-                {files.length > 0 && (
-                  <div className="tf-file-list">
-                    {files.map((file, index) => (
-                      <div key={index} className="tf-file-item">
-                        <div className="tf-file-info">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <polyline points="14,2 14,8 20,8"/>
-                          </svg>
-                          <div>
-                            <div className="tf-file-name">{file.name}</div>
-                            <div className="tf-file-size">{formatFileSize(file.size)}</div>
-                          </div>
-                        </div>
-                        <button 
-                          type="button" 
-                          className="tf-file-remove"
-                          onClick={() => removeFile(index)}
-                          title="Remover arquivo"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="18" y1="6" x2="6" y2="18"/>
-                            <line x1="6" y1="6" x2="18" y2="18"/>
-                          </svg>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              </div>
+            </div>
+
+            {category === 'Solicitar Ativo' && (
+              <div className="tf-group" style={{ animation: 'tf-fadeUp 0.3s ease' }}>
+                <label className="tf-label">Qual equipamento você precisa? <span>*</span></label>
+                <select className="tf-select" value={asset} onChange={e => setAsset(e.target.value)} required>
+                  <option value="">Selecione o ativo...</option>
+                  {assetOptions.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+            )}
+
+            <div className="tf-group">
+              <label className="tf-label">Mais detalhes <span>*</span></label>
+              <textarea 
+                className="tf-textarea" 
+                placeholder="Forneça o máximo de informações possível..."
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="tf-group">
+              <label className="tf-label">Anexos</label>
+              <div 
+                className={`tf-dropzone ${isDragOver ? 'dragover' : ''}`}
+                onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={e => { e.preventDefault(); setIsDragOver(false); handleFileSelect(e.dataTransfer.files); }}
+              >
+                <svg className="tf-drop-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <div style={{fontSize: '14px', fontWeight: 500, color: '#475569'}}>Arraste ou clique para anexar</div>
+                <div style={{fontSize: '12px', color: '#94a3b8', marginTop: '4px'}}>PNG, JPG ou PDF até 10MB</div>
+                <input 
+                  type="file" 
+                  multiple 
+                  style={{position:'absolute', inset:0, opacity:0, cursor:'pointer'}} 
+                  onChange={e => handleFileSelect(e.target.files)}
+                />
               </div>
 
-              <div className="tf-info">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0, marginTop:1}}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                <p>Quanto mais detalhes você fornecer, mais rápido nossa equipe poderá resolver seu chamado.</p>
-              </div>
+              {files.map((file, i) => (
+                <div key={i} className="tf-file-badge">
+                  <span style={{fontWeight: 500, color: '#334155'}}>{file.name} <small style={{color:'#94a3b8', marginLeft: 8}}>{formatFileSize(file.size)}</small></span>
+                  <button 
+                    type="button" 
+                    onClick={() => setFiles(prev => prev.filter((_, idx) => idx !== i))}
+                    style={{background:'none', border:'none', color:'#ef4444', cursor:'pointer', padding: '4px'}}
+                  >✕</button>
+                </div>
+              ))}
+            </div>
 
-              {/* NOVO: Ajuste na validação do botão submit para checar o asset */}
-              <button type="submit" className="tf-submit" disabled={isSubmitting || !title.trim() || !description.trim() || !category || (category === 'Solicitar Ativo' && !asset)}>
-                {isSubmitting ? (
-                  <span className="spinner" style={{width: 16, height: 16, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite'}} />
-                ) : (
-                  <>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                    Enviar Chamado
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
+            <button 
+              type="submit" 
+              className="tf-btn-submit" 
+              disabled={isSubmitting || !title.trim() || !description.trim() || !category || (category === 'Solicitar Ativo' && !asset)}
+            >
+              {isSubmitting ? <div className="tf-spinner" /> : 'Criar Chamado'}
+            </button>
+          </form>
         </div>
       </div>
-    </>
+    </div>
   );
 }
