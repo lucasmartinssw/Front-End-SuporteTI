@@ -41,7 +41,18 @@ interface TicketFormProps {
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=DM+Sans:wght@400;500&display=swap');
 
+  /* NOVO: Container para centralizar a tela */
+  .tf-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+
   .tf-wrap {
+    width: 100%;
     max-width: 640px;
     animation: fadeUp 0.3s ease both;
   }
@@ -66,6 +77,7 @@ const styles = `
     border: 1px solid #f0f1f5;
     border-radius: 16px;
     padding: 32px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.03); /* Adicionado um leve sombreamento para destacar */
   }
 
   .tf-field { margin-bottom: 22px; }
@@ -184,8 +196,9 @@ const styles = `
     gap: 8px;
   }
 
-  .tf-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
-  .tf-submit:active { transform: translateY(0); }
+  .tf-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
+  .tf-submit:active:not(:disabled) { transform: translateY(0); }
+  .tf-submit:disabled { opacity: 0.7; cursor: not-allowed; }
 
   /* File upload */
   .tf-file-upload {
@@ -239,9 +252,7 @@ const styles = `
     cursor: pointer;
   }
 
-  .tf-file-list {
-    margin-top: 16px;
-  }
+  .tf-file-list { margin-top: 16px; }
 
   .tf-file-item {
     display: flex;
@@ -254,35 +265,20 @@ const styles = `
     margin-bottom: 8px;
   }
 
-  .tf-file-info {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 1;
-  }
-
-  .tf-file-name {
-    font-size: 13px;
-    color: #374151;
-    font-weight: 500;
-  }
-
-  .tf-file-size {
-    font-size: 11px;
-    color: #9ca3af;
-  }
-
+  .tf-file-info { display: flex; align-items: center; gap: 8px; flex: 1; }
+  .tf-file-name { font-size: 13px; color: #374151; font-weight: 500; }
+  .tf-file-size { font-size: 11px; color: #9ca3af; }
+  
   .tf-file-remove {
     color: #ef4444;
     cursor: pointer;
     padding: 2px;
     border-radius: 3px;
     transition: background 0.15s;
+    background: none;
+    border: none;
   }
-
-  .tf-file-remove:hover {
-    background: #fef2f2;
-  }
+  .tf-file-remove:hover { background: #fef2f2; }
 
   @media (max-width: 600px) {
     .tf-row { grid-template-columns: 1fr; }
@@ -291,15 +287,21 @@ const styles = `
   }
 `;
 
-const categories = ['Hardware', 'Software', 'Conexão com Internet', 'Acessos', 'Sistemas', 'Segurança', 'Impressora', 'Telefone/Celular', 'Outros'];
+const categories = ['Solicitar Ativo', 'Hardware', 'Software', 'Conexão com Internet', 'Acessos', 'Sistemas', 'Segurança', 'Impressora', 'Telefone/Celular', 'Outros'];
+
+// NOVO: Lista de ativos disponíveis
+const assetOptions = ['Notebook', 'Monitor', 'Teclado', 'Mouse', 'Cadeira Ergonômica', 'Headset', 'Celular Corporativo', 'Outro'];
 
 export function TicketForm({ onSubmit, userEmail }: TicketFormProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [category, setCategory] = useState('');
+  // NOVO: Estado para armazenar o ativo selecionado
+  const [asset, setAsset] = useState(''); 
   const [files, setFiles] = useState<File[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -314,7 +316,6 @@ export function TicketForm({ onSubmit, userEmail }: TicketFormProps) {
     
     const newFiles = Array.from(selectedFiles);
     const validFiles = newFiles.filter(file => {
-      // Check file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
         alert(`Arquivo "${file.name}" é muito grande. Máximo 10MB.`);
         return false;
@@ -345,21 +346,26 @@ export function TicketForm({ onSubmit, userEmail }: TicketFormProps) {
     handleFileSelect(e.dataTransfer.files);
   };
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim() || !category) return;
+    
+    // Validação extra caso seja solicitação de ativo
+    if (!title.trim() || !description.trim() || !category || (category === 'Solicitar Ativo' && !asset)) return;
+    
     setIsSubmitting(true);
     
-    // Create a FileList-like object from the files array
     const dataTransfer = new DataTransfer();
     files.forEach(file => dataTransfer.items.add(file));
     
+    // NOVO: Adiciona o ativo solicitado no início da descrição
+    const finalDescription = category === 'Solicitar Ativo' && asset 
+      ? `[Ativo Solicitado: ${asset}]\n\n${description.trim()}`
+      : description.trim();
+
     try {
       await onSubmit({ 
         title: title.trim(), 
-        description: description.trim(), 
+        description: finalDescription, 
         priority, 
         category, 
         submittedBy: userEmail,
@@ -371,6 +377,7 @@ export function TicketForm({ onSubmit, userEmail }: TicketFormProps) {
       setDescription(''); 
       setPriority('medium'); 
       setCategory('');
+      setAsset(''); // Limpar ativo
       setFiles([]);
     } catch (err) {
       // errors handled by parent
@@ -389,118 +396,141 @@ export function TicketForm({ onSubmit, userEmail }: TicketFormProps) {
   return (
     <>
       <style>{styles}</style>
-      <div className="tf-wrap">
-        <div className="tf-heading">
-          <h1 className="tf-title">Novo Chamado</h1>
-          <p className="tf-sub">Preencha os dados abaixo para abrir um chamado com a equipe de TI</p>
-        </div>
+      {/* NOVO: Div wrapper tf-container para centralizar o formulário */}
+      <div className="tf-container">
+        <div className="tf-wrap">
+          <div className="tf-heading">
+            <h1 className="tf-title">Novo Chamado</h1>
+            <p className="tf-sub">Preencha os dados abaixo para abrir um chamado com a equipe de TI</p>
+          </div>
 
-        <div className="tf-card">
-          <form onSubmit={handleSubmit}>
-            <div className="tf-field">
-              <label className="tf-label">Breve Descrição <span>*</span></label>
-              <input className="tf-input" type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Descreva brevemente o problema ou solicitação" required />
-            </div>
-
-            <div className="tf-row tf-field">
-              <div>
-                <label className="tf-label">Categoria <span>*</span></label>
-                <select className="tf-select" value={category} onChange={e => setCategory(e.target.value)} required>
-                  <option value="">Selecione a categoria</option>
-                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+          <div className="tf-card">
+            <form onSubmit={handleSubmit}>
+              <div className="tf-field">
+                <label className="tf-label">Breve Descrição <span>*</span></label>
+                <input className="tf-input" type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Descreva brevemente o problema ou solicitação" required />
               </div>
-              <div>
-                <label className="tf-label">Prioridade <span>*</span></label>
-                <div className="tf-priority-grid">
-                  {priorities.map(p => (
-                    <button key={p.value} type="button" className={`tf-priority-btn ${p.cls} ${priority === p.value ? 'active' : ''}`} onClick={() => setPriority(p.value)}>
-                      <span className="tf-priority-dot" />
-                      {p.label}
-                    </button>
-                  ))}
+
+              <div className="tf-row tf-field">
+                <div>
+                  <label className="tf-label">Categoria <span>*</span></label>
+                  <select 
+                    className="tf-select" 
+                    value={category} 
+                    onChange={e => {
+                      setCategory(e.target.value);
+                      if (e.target.value !== 'Solicitar Ativo') setAsset(''); // Limpa o ativo se mudar de categoria
+                    }} 
+                    required
+                  >
+                    <option value="">Selecione a categoria</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
-              </div>
-            </div>
-
-            <div className="tf-field">
-              <label className="tf-label">Descrição detalhada <span>*</span></label>
-              <textarea className="tf-textarea" value={description} onChange={e => setDescription(e.target.value)} placeholder="Descreva detalhadamente o que está ocorrendo, incluindo mensagens de erro, quando começou e qualquer informação relevante..." required />
-            </div>
-
-            <div className="tf-field">
-              <label className="tf-label">Anexar arquivos (opcional)</label>
-              <div 
-                className={`tf-file-upload ${isDragOver ? 'dragover' : ''}`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-              >
-                <svg className="tf-file-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                  <polyline points="14,2 14,8 20,8"/>
-                  <line x1="16" y1="13" x2="8" y2="13"/>
-                  <line x1="16" y1="17" x2="8" y2="17"/>
-                  <polyline points="10,9 9,9 8,9"/>
-                </svg>
-                <div className="tf-file-upload-text">Clique para selecionar ou arraste arquivos aqui</div>
-                <div className="tf-file-upload-sub">Máximo 10MB por arquivo</div>
-                <input 
-                  type="file" 
-                  className="tf-file-input" 
-                  multiple 
-                  accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
-                  onChange={(e) => handleFileSelect(e.target.files)}
-                />
-              </div>
-              
-              {files.length > 0 && (
-                <div className="tf-file-list">
-                  {files.map((file, index) => (
-                    <div key={index} className="tf-file-item">
-                      <div className="tf-file-info">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
-                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                          <polyline points="14,2 14,8 20,8"/>
-                        </svg>
-                        <div>
-                          <div className="tf-file-name">{file.name}</div>
-                          <div className="tf-file-size">{formatFileSize(file.size)}</div>
-                        </div>
-                      </div>
-                      <button 
-                        type="button" 
-                        className="tf-file-remove"
-                        onClick={() => removeFile(index)}
-                        title="Remover arquivo"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <line x1="18" y1="6" x2="6" y2="18"/>
-                          <line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
+                <div>
+                  <label className="tf-label">Prioridade <span>*</span></label>
+                  <div className="tf-priority-grid">
+                    {priorities.map(p => (
+                      <button key={p.value} type="button" className={`tf-priority-btn ${p.cls} ${priority === p.value ? 'active' : ''}`} onClick={() => setPriority(p.value)}>
+                        <span className="tf-priority-dot" />
+                        {p.label}
                       </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* NOVO: Renderização condicional para Solicitação de Ativo */}
+              {category === 'Solicitar Ativo' && (
+                <div className="tf-field" style={{ animation: 'fadeUp 0.3s ease both' }}>
+                  <label className="tf-label">Qual ativo você deseja solicitar? <span>*</span></label>
+                  <select className="tf-select" value={asset} onChange={e => setAsset(e.target.value)} required>
+                    <option value="">Selecione um ativo</option>
+                    {assetOptions.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
                 </div>
               )}
-            </div>
 
-            <div className="tf-info">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0, marginTop:1}}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-              <p>Quanto mais detalhes você fornecer, mais rápido nossa equipe poderá resolver seu chamado.</p>
-            </div>
+              <div className="tf-field">
+                <label className="tf-label">Descrição detalhada <span>*</span></label>
+                <textarea className="tf-textarea" value={description} onChange={e => setDescription(e.target.value)} placeholder={category === 'Solicitar Ativo' ? "Justifique a necessidade deste ativo e detalhe especificações (ex: tamanho, modelo, etc)..." : "Descreva detalhadamente o que está ocorrendo, incluindo mensagens de erro, quando começou e qualquer informação relevante..."} required />
+              </div>
 
-            <button type="submit" className="tf-submit" disabled={isSubmitting || !title.trim() || !description.trim() || !category}>
-              {isSubmitting ? (
-                <span className="spinner" />
-              ) : (
-                <>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  Enviar Chamado
-                </>
-              )}
-            </button>
-          </form>
+              <div className="tf-field">
+                <label className="tf-label">Anexar arquivos (opcional)</label>
+                <div 
+                  className={`tf-file-upload ${isDragOver ? 'dragover' : ''}`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
+                  <svg className="tf-file-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14,2 14,8 20,8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                    <polyline points="10,9 9,9 8,9"/>
+                  </svg>
+                  <div className="tf-file-upload-text">Clique para selecionar ou arraste arquivos aqui</div>
+                  <div className="tf-file-upload-sub">Máximo 10MB por arquivo</div>
+                  <input 
+                    type="file" 
+                    className="tf-file-input" 
+                    multiple 
+                    accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar"
+                    onChange={(e) => handleFileSelect(e.target.files)}
+                  />
+                </div>
+                
+                {files.length > 0 && (
+                  <div className="tf-file-list">
+                    {files.map((file, index) => (
+                      <div key={index} className="tf-file-item">
+                        <div className="tf-file-info">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14,2 14,8 20,8"/>
+                          </svg>
+                          <div>
+                            <div className="tf-file-name">{file.name}</div>
+                            <div className="tf-file-size">{formatFileSize(file.size)}</div>
+                          </div>
+                        </div>
+                        <button 
+                          type="button" 
+                          className="tf-file-remove"
+                          onClick={() => removeFile(index)}
+                          title="Remover arquivo"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="tf-info">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0, marginTop:1}}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <p>Quanto mais detalhes você fornecer, mais rápido nossa equipe poderá resolver seu chamado.</p>
+              </div>
+
+              {/* NOVO: Ajuste na validação do botão submit para checar o asset */}
+              <button type="submit" className="tf-submit" disabled={isSubmitting || !title.trim() || !description.trim() || !category || (category === 'Solicitar Ativo' && !asset)}>
+                {isSubmitting ? (
+                  <span className="spinner" style={{width: 16, height: 16, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite'}} />
+                ) : (
+                  <>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    Enviar Chamado
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </>

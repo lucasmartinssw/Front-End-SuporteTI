@@ -506,6 +506,39 @@ export default function App() {
         ))}
       </div>
 
+      {/* ── NOVO CAMPO: FILA DE ATIVOS ABERTOS ── */}
+    <div className="d-card" style={{ marginBottom: 18 }}>
+      <div className="d-card-hdr">
+        <div className="d-card-title">
+          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#f59e0b', marginRight: 8 }}></span>
+          Ativos Pendentes de Início
+        </div>
+      </div>
+      <div className="d-card-body">
+        {myTickets.filter(t => t.status === 'open').length === 0 ? (
+          <p style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center' }}>Nenhum ativo aguardando no momento.</p>
+        ) : (
+          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 4 }}>
+            {myTickets.filter(t => t.status === 'open').map(t => (
+              <div 
+                key={t.id} 
+                onClick={() => handleTicketSelect(t)}
+                style={{ 
+                  minWidth: '220px', background: '#fffbeb', border: '1px solid #fde68a', 
+                  padding: '12px', borderRadius: '10px', cursor: 'pointer' 
+                }}
+              >
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#92400e', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</p>
+                <p style={{ fontSize: 11, color: '#b45309' }}>Aberto {timeAgo(t.createdAt)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+    {/* ────────────────────────────────────── */}
+
+    
       {/* My tickets list or empty state */}
       {myTickets.length === 0 ? (
         <div className="user-empty">
