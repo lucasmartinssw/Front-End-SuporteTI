@@ -8,7 +8,7 @@ export interface Ticket {
   category: string;
   status: 'open' | 'in-progress' | 'resolved' | 'closed';
   submittedBy: string;
-  assignedTo?: string;
+  tecnicos?: { id: number; nome: string; email: string }[];
   assetId?: number;
   assetNome?: string;
   createdAt: Date;

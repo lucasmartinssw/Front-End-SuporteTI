@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { chamados as chamadosApi, ativos as ativosApi, setToken, STATUS_MAP, PRIORITY_MAP, STATUS_ID_MAP, PRIORITY_ID_MAP } from './api';
+import { chamados as chamadosApi, ativos as ativosApi, users as usersApi, notificacoes as notificacoesApi, setToken, STATUS_MAP, PRIORITY_MAP, STATUS_ID_MAP, PRIORITY_ID_MAP, Notificacao } from './api';
 import { AssetList, Asset } from './components/AssetList';
 import { AssetForm } from './components/AssetForm';
 import { AssetDetail } from './components/AssetDetail';
@@ -10,21 +10,7 @@ import { TicketDetail } from './components/TicketDetail';
 import { toast } from 'sonner';
 import { Login } from './components/Login';
 
-// ── Static weekly chart data (replace with real API data as needed) ──
-const WEEKLY_DATA = [
-  { day: 'Seg', abertos: 3, resolvidos: 2 },
-  { day: 'Ter', abertos: 5, resolvidos: 4 },
-  { day: 'Qua', abertos: 2, resolvidos: 5 },
-  { day: 'Qui', abertos: 7, resolvidos: 3 },
-  { day: 'Sex', abertos: 4, resolvidos: 6 },
-  { day: 'Sáb', abertos: 1, resolvidos: 2 },
-  { day: 'Dom', abertos: 2, resolvidos: 1 },
-];
 
-const TREND_DATA = [
-  { day: 'Seg', total: 5 }, { day: 'Ter', total: 9 }, { day: 'Qua', total: 7 },
-  { day: 'Qui', total: 10 }, { day: 'Sex', total: 8 }, { day: 'Sáb', total: 3 }, { day: 'Dom', total: 4 },
-];
 
 const STATUS_COLORS: Record<string, string> = {
   'Aberto': '#f59e0b', 'Em Progresso': '#3b82f6', 'Resolvido': '#10b981', 'Fechado': '#e5e7eb',
@@ -183,7 +169,10 @@ export default function App() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
+  const [showNotifs, setShowNotifs] = useState(false);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [technicians, setTechnicians] = useState<{id: number; nome: string; email: string}[]>([]);
 
   // Restore api.ts module token on page load (localStorage session restore)
   useEffect(() => {
@@ -196,6 +185,20 @@ export default function App() {
     if (!isAuthenticated || !authToken) return;
     loadData();
   }, [isAuthenticated, authToken]);
+
+  // Poll notifications every 30 seconds
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const fetchNotifs = async () => {
+      try {
+        const data = await notificacoesApi.list();
+        setNotificacoes(data);
+      } catch {}
+    };
+    fetchNotifs();
+    const interval = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
 
   const loadData = async () => {
     setIsLoadingData(true);
@@ -210,7 +213,7 @@ export default function App() {
         category: t.categoria || 'Outros',
         status: STATUS_MAP[t.status_id] || 'open',
         submittedBy: t.user_email || '',
-        assignedTo: t.assignedTo,
+        tecnicos: (t.tecnicos || []) as {id: number; nome: string; email: string}[],
         assetId: t.ativo_id,
         assetNome: t.ativo_nome,
         createdAt: new Date(t.created_at),
@@ -225,6 +228,25 @@ export default function App() {
         setAssets(rawAtivos as any);
       } catch {
         // Non-critical — just leave assets empty if it fails
+      }
+
+      // Load technicians for assignment dropdown
+      try {
+        const techs = await users.list('tecnico');
+        const admins = await users.list('admin');
+        setTechnicians([...techs, ...admins]);
+      } catch {
+        // Non-critical
+      }
+
+      // Load technicians list (for assignment dropdown)
+      try {
+        const rawTechs = await usersApi.list('tecnico');
+        const rawAdmins = await usersApi.list('admin');
+        const allTechs = [...rawTechs, ...rawAdmins];
+        setTechnicians(allTechs.map((u: any) => ({ id: u.id, nome: u.nome, email: u.email })));
+      } catch {
+        // Non-critical
       }
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
@@ -276,11 +298,32 @@ export default function App() {
     }
   };
 
-  const handleAssignTicket = (ticketId: string, assignee: string) => {
-    const updated = tickets.map(t => t.id === ticketId ? { ...t, assignedTo: assignee, updatedAt: new Date() } : t);
-    setTickets(updated);
-    if (selectedTicket?.id === ticketId) setSelectedTicket(prev => prev ? { ...prev, assignedTo: assignee, updatedAt: new Date() } : null);
-    toast.success('Chamado designado');
+  const handleAddTecnico = async (ticketId: string, userId: number) => {
+    try {
+      await chamadosApi.addTecnico(Number(ticketId), userId);
+      const tech = technicians.find(t => t.id === userId);
+      if (!tech) return;
+      const addTech = (t: Ticket) => t.id === ticketId
+        ? { ...t, tecnicos: [...(t.tecnicos || []), tech], updatedAt: new Date() } : t;
+      setTickets(prev => prev.map(addTech));
+      if (selectedTicket?.id === ticketId) setSelectedTicket(prev => prev ? addTech(prev) : null);
+      toast.success(`${tech.nome} adicionado ao chamado!`);
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao adicionar técnico.');
+    }
+  };
+
+  const handleRemoveTecnico = async (ticketId: string, userId: number) => {
+    try {
+      await chamadosApi.removeTecnico(Number(ticketId), userId);
+      const removeTech = (t: Ticket) => t.id === ticketId
+        ? { ...t, tecnicos: (t.tecnicos || []).filter((tc: any) => tc.id !== userId), updatedAt: new Date() } : t;
+      setTickets(prev => prev.map(removeTech));
+      if (selectedTicket?.id === ticketId) setSelectedTicket(prev => prev ? removeTech(prev) : null);
+      toast.success('Técnico removido do chamado.');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao remover técnico.');
+    }
   };
 
   const handleAddComment = async (ticketId: string, comment: string, isInternal: boolean) => {
@@ -369,6 +412,43 @@ export default function App() {
     { name: 'Baixo', value: tickets.filter(t => t.priority === 'low').length, color: PRIORITY_COLORS['Baixo'] },
   ];
   const allRecent = [...tickets].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()).slice(0, 4);
+
+  // ── Chart data computed from real tickets ───────────────────
+  const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+  const WEEKLY_DATA = (() => {
+    const today = new Date();
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (6 - i));
+      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const dayEnd   = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+      return {
+        day: DAYS_PT[d.getDay()],
+        abertos:   tickets.filter(t => t.createdAt >= dayStart && t.createdAt < dayEnd).length,
+        resolvidos: tickets.filter(t => t.status === 'resolved' && t.updatedAt >= dayStart && t.updatedAt < dayEnd).length,
+      };
+    });
+  })();
+
+  const TREND_DATA = WEEKLY_DATA.map(d => ({ day: d.day, total: d.abertos + d.resolvidos }));
+
+  const weekTotal = TREND_DATA.reduce((s, d) => s + d.total, 0);
+  const prevWeekTotal = (() => {
+    const today = new Date();
+    let count = 0;
+    for (let i = 7; i < 14; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const dayEnd   = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+      count += tickets.filter(t => t.createdAt >= dayStart && t.createdAt < dayEnd).length;
+    }
+    return count;
+  })();
+  const weekTrend = prevWeekTotal === 0
+    ? null
+    : Math.round(((weekTotal - prevWeekTotal) / prevWeekTotal) * 100);
 
   // ── CLIENT dashboard render ──────────────────────────
   const renderClientDashboard = () => (
@@ -567,8 +647,12 @@ export default function App() {
           </div>
           <div className="d-card-body" style={{ paddingTop: 8 }}>
             <div style={{ marginBottom: 12 }}>
-              <span style={{ fontFamily: 'Sora, sans-serif', fontSize: 26, fontWeight: 700, color: '#0f1117', letterSpacing: '-0.5px' }}>46</span>
-              <span style={{ fontSize: 12, color: '#10b981', fontWeight: 600, marginLeft: 8 }}>↑ 18% vs semana passada</span>
+              <span style={{ fontFamily: 'Sora, sans-serif', fontSize: 26, fontWeight: 700, color: '#0f1117', letterSpacing: '-0.5px' }}>{weekTotal}</span>
+              {weekTrend !== null && (
+                <span style={{ fontSize: 12, color: weekTrend >= 0 ? '#10b981' : '#ef4444', fontWeight: 600, marginLeft: 8 }}>
+                  {weekTrend >= 0 ? '↑' : '↓'} {Math.abs(weekTrend)}% vs semana passada
+                </span>
+              )}
             </div>
             <ResponsiveContainer width="100%" height={100}>
               <LineChart data={TREND_DATA}>
@@ -667,11 +751,56 @@ export default function App() {
               </nav>
             </div>
             <div className="header-right">
+              {/* Bell icon */}
+              <div style={{position:'relative'}}>
+                <button
+                  onClick={() => setShowNotifs(v => !v)}
+                  style={{position:'relative',background:'none',border:'1.5px solid #e5e7eb',borderRadius:9,width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',color:'#6b7280',transition:'all 0.18s'}}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                  {notificacoes.length > 0 && (
+                    <span style={{position:'absolute',top:-4,right:-4,background:'#ef4444',color:'#fff',borderRadius:20,fontSize:9,fontWeight:700,minWidth:16,height:16,display:'flex',alignItems:'center',justifyContent:'center',padding:'0 4px'}}>
+                      {notificacoes.length > 9 ? '9+' : notificacoes.length}
+                    </span>
+                  )}
+                </button>
+                {showNotifs && (
+                  <div style={{position:'absolute',right:0,top:44,width:320,background:'#fff',border:'1px solid #f0f1f5',borderRadius:14,boxShadow:'0 8px 32px rgba(0,0,0,0.12)',zIndex:200,overflow:'hidden'}}>
+                    <div style={{padding:'12px 16px',borderBottom:'1px solid #f7f8fc',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                      <span style={{fontFamily:'Sora,sans-serif',fontSize:13,fontWeight:600,color:'#111827'}}>Notificações</span>
+                      {notificacoes.length > 0 && (
+                        <button onClick={async () => { await notificacoesApi.dismissAll(); setNotificacoes([]); setShowNotifs(false); }} style={{fontSize:11.5,color:'#6366f1',background:'none',border:'none',cursor:'pointer',fontWeight:600,fontFamily:'DM Sans,sans-serif'}}>
+                          Dispensar todas
+                        </button>
+                      )}
+                    </div>
+                    <div style={{maxHeight:320,overflowY:'auto'}}>
+                      {notificacoes.length === 0 ? (
+                        <p style={{textAlign:'center',padding:'24px 16px',fontSize:13,color:'#9ca3af'}}>Nenhuma notificação</p>
+                      ) : notificacoes.map(n => (
+                        <div key={n.id} style={{display:'flex',alignItems:'flex-start',gap:10,padding:'10px 16px',borderBottom:'1px solid #f7f8fc',cursor:'pointer'}}
+                          onClick={() => { const t = tickets.find(t => String(t.id) === String(n.chamado_id)); if(t){handleTicketSelect(t);} setShowNotifs(false); }}>
+                          <div style={{width:28,height:28,borderRadius:8,background: n.tipo==='ticket_created'?'#eef2ff':n.tipo==='status_change'?'#ecfdf5':'#fffbeb',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:2}}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={n.tipo==='ticket_created'?'#6366f1':n.tipo==='status_change'?'#10b981':'#f59e0b'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              {n.tipo==='status_change' ? <path d="M20 6L9 17l-5-5"/> : n.tipo==='ticket_created' ? <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></> : <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>}
+                            </svg>
+                          </div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <p style={{fontSize:12.5,fontWeight:500,color:'#111827',marginBottom:2,lineHeight:1.4}}>{n.mensagem}</p>
+                            <p style={{fontSize:11,color:'#9ca3af'}}>{new Intl.DateTimeFormat('pt-BR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(n.created_at))}</p>
+                          </div>
+                          <button onClick={async e => { e.stopPropagation(); await notificacoesApi.dismiss(n.id); setNotificacoes(prev => prev.filter(x => x.id !== n.id)); }} style={{background:'none',border:'none',cursor:'pointer',color:'#d1d5db',fontSize:14,padding:0,flexShrink:0,lineHeight:1}}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               <span className={`role-pill ${userRole === 'client' ? 'client' : 'tech'}`}>
                 {userRole === 'client' ? 'Usuário' : 'Analista TI'}
               </span>
               <span className="welcome-badge">Bem-vindo, <strong>{userName}</strong></span>
-              <button className="btn-ghost" onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_role'); localStorage.removeItem('auth_email'); localStorage.removeItem('auth_name'); setIsAuthenticated(false); setAuthToken(null); setToken(null); setTickets([]); setAssets([]); }}>Sair</button>
+              <button className="btn-ghost" onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_role'); localStorage.removeItem('auth_email'); localStorage.removeItem('auth_name'); setIsAuthenticated(false); setAuthToken(null); setToken(null); setTickets([]); setAssets([]); setNotificacoes([]); setShowNotifs(false); }}>Sair</button>
             </div>
           </div>
         </header>
@@ -679,13 +808,13 @@ export default function App() {
         <main className="app-main">
           {activeView === 'dashboard' && (userRole === 'client' ? renderClientDashboard() : renderTechDashboard())}
           {activeView === 'tickets' && (
-            <TicketList tickets={tickets} userRole={userRole} userEmail={userEmail} onTicketSelect={handleTicketSelect} onStatusUpdate={handleStatusUpdate} onAssignTicket={handleAssignTicket} />
+            <TicketList tickets={tickets} userRole={userRole} userEmail={userEmail} technicians={technicians} onTicketSelect={handleTicketSelect} onStatusUpdate={handleStatusUpdate} onAddTecnico={handleAddTecnico} onRemoveTecnico={handleRemoveTecnico} />
           )}
           {activeView === 'submit' && userRole === 'client' && (
             <TicketForm onSubmit={handleSubmitTicket} userEmail={userEmail} assets={assets.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, localizacao: a.localizacao }))} />
           )}
           {activeView === 'detail' && selectedTicket && (
-            <TicketDetail ticket={selectedTicket} userRole={userRole} userEmail={userEmail} onBack={() => setActiveView('tickets')} onAddComment={handleAddComment} onStatusUpdate={handleStatusUpdate} onAssignTicket={handleAssignTicket} />
+            <TicketDetail ticket={selectedTicket} userRole={userRole} userEmail={userEmail} technicians={technicians} onBack={() => setActiveView('tickets')} onAddComment={handleAddComment} onStatusUpdate={handleStatusUpdate} onAddTecnico={handleAddTecnico} onRemoveTecnico={handleRemoveTecnico} />
           )}
           {activeView === 'assets' && userRole === 'it-executive' && (
             <AssetList

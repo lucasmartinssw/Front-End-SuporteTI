@@ -170,11 +170,18 @@ export const chamados = {
     }),
 
   // Update status or priority (tech/admin only)
-  update: (id: number, data: { status_id?: number; prioridade_id?: number }) =>
+  update: (id: number, data: { status_id?: number; prioridade_id?: number; assigned_to?: number | null }) =>
     request<{ message: string }>(`/chamados/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
+
+  // Assign / remove technicians
+  addTecnico: (chamadoId: number, userId: number) =>
+    request<{ message: string }>(`/chamados/${chamadoId}/tecnicos/${userId}`, { method: 'POST' }),
+
+  removeTecnico: (chamadoId: number, userId: number) =>
+    request<{ message: string }>(`/chamados/${chamadoId}/tecnicos/${userId}`, { method: 'DELETE' }),
 
   // List messages for a ticket
   listMensagens: (id: number) =>
@@ -282,8 +289,25 @@ export interface UserFromAPI {
   cargo: 'admin' | 'tecnico' | 'usuario';
 }
 
+export interface Notificacao {
+  id: number;
+  user_id: number;
+  tipo: 'status_change' | 'new_message' | 'ticket_created';
+  chamado_id: number;
+  chamado_titulo: string;
+  mensagem: string;
+  lida: boolean;
+  created_at: string;
+}
+
+export const notificacoes = {
+  list: () => request<Notificacao[]>('/notificacoes'),
+  dismiss: (id: number) => request<{ message: string }>(`/notificacoes/${id}/lida`, { method: 'PATCH' }),
+  dismissAll: () => request<{ message: string }>('/notificacoes/lida-todas', { method: 'PATCH' }),
+};
+
 export const users = {
-  list: () => request<UserFromAPI[]>('/users'),
+  list: (cargo?: string) => request<UserFromAPI[]>(cargo ? `/users?cargo=${cargo}` : '/users'),
 };
 
 // ─────────────────────────────────────────────────────────────

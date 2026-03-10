@@ -8,7 +8,9 @@ interface TicketDetailProps {
   onBack: () => void;
   onAddComment: (ticketId: string, comment: string, isInternal: boolean) => void;
   onStatusUpdate: (ticketId: string, status: Ticket['status']) => void;
-  onAssignTicket: (ticketId: string, assignee: string) => void;
+  technicians: { id: number; nome: string; email: string }[];
+  onAddTecnico: (ticketId: string, userId: number) => void;
+  onRemoveTecnico: (ticketId: string, userId: number) => void;
 }
 
 const styles = `
@@ -292,9 +294,7 @@ const styles = `
   }
 `;
 
-const itExecutives = ['john.doe@company.com', 'jane.smith@company.com', 'mike.wilson@company.com'];
-
-export function TicketDetail({ ticket, userRole, userEmail, onBack, onAddComment, onStatusUpdate, onAssignTicket }: TicketDetailProps) {
+export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack, onAddComment, onStatusUpdate, onAddTecnico, onRemoveTecnico }: TicketDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
 
@@ -431,10 +431,19 @@ export function TicketDetail({ ticket, userRole, userEmail, onBack, onAddComment
                   <svg className="td-info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   <div><p className="td-info-label">Atualizado em</p><p className="td-info-value">{formatDate(ticket.updatedAt)}</p></div>
                 </div>
-                {ticket.assignedTo && (
+                {ticket.tecnicos && ticket.tecnicos.length > 0 && (
                   <div className="td-info-row">
                     <svg className="td-info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    <div><p className="td-info-label">Responsável</p><p className="td-info-value" style={{color:'#6366f1'}}>{ticket.assignedTo.split('@')[0]}</p></div>
+                    <div>
+                      <p className="td-info-label">Técnicos</p>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:4,marginTop:4}}>
+                        {(ticket.tecnicos || []).map((tc: any) => (
+                          <span key={tc.id} style={{display:'inline-flex',alignItems:'center',gap:4,background:'#eef2ff',color:'#4f46e5',borderRadius:20,padding:'3px 8px',fontSize:11.5,fontWeight:600}}>
+                            {tc.nome}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
                 {ticket.assetId && (
@@ -463,12 +472,24 @@ export function TicketDetail({ ticket, userRole, userEmail, onBack, onAddComment
                     <option value="resolved">Resolvido</option>
                     <option value="closed">Fechado</option>
                   </select>
-                  {!ticket.assignedTo && (
+                  {true && (
                     <>
-                      <p className="td-action-label">Designar para</p>
-                      <select className="td-select" onChange={e => onAssignTicket(ticket.id, e.target.value)} defaultValue="">
-                        <option value="">Selecionar responsável</option>
-                        {itExecutives.map(exec => <option key={exec} value={exec}>{exec.split('@')[0]}</option>)}
+                      <p className="td-action-label">Técnicos</p>
+                      {(ticket.tecnicos || []).map((tc: any) => (
+                        <div key={tc.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#eef2ff',borderRadius:8,padding:'5px 10px',marginBottom:4}}>
+                          <span style={{fontSize:12.5,fontWeight:600,color:'#4f46e5'}}>{tc.nome}</span>
+                          <button onClick={() => onRemoveTecnico(ticket.id, tc.id)} style={{background:'none',border:'none',cursor:'pointer',color:'#9ca3af',fontSize:14,padding:0,lineHeight:1}}>✕</button>
+                        </div>
+                      ))}
+                      <select
+                        className="td-select"
+                        value=""
+                        onChange={e => { if (e.target.value) onAddTecnico(ticket.id, Number(e.target.value)); }}
+                      >
+                        <option value="">+ Adicionar técnico</option>
+                        {technicians.filter(t => !(ticket.tecnicos || []).find((tc: any) => tc.id === t.id)).map(t => (
+                          <option key={t.id} value={String(t.id)}>{t.nome}</option>
+                        ))}
                       </select>
                     </>
                   )}
@@ -477,10 +498,41 @@ export function TicketDetail({ ticket, userRole, userEmail, onBack, onAddComment
             )}
 
             {userRole === 'client' && (
-              <div className="td-urgent-card">
-                <p className="td-urgent-title">🔴 Precisa de ajuda urgente?</p>
-                <p className="td-urgent-text">Entre em contato diretamente com o TI: <a className="td-urgent-link" href="mailto:suporteTi@email.com.br">suporteTi@email.com.br</a></p>
-              </div>
+              <>
+                <div className="td-card" style={{marginBottom:'16px'}}>
+                  <div className="td-card-header">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    <span className="td-card-title">Meu chamado</span>
+                  </div>
+                  <div className="td-card-body" style={{padding:'16px 20px'}}>
+                    {ticket.status !== 'closed' ? (
+                      <>
+                        <p style={{fontSize:12.5,color:'#6b7280',marginBottom:10,lineHeight:1.5}}>Problema resolvido? Feche o chamado para informar a equipe de TI.</p>
+                        <button
+                          onClick={() => onStatusUpdate(ticket.id, 'resolved')}
+                          style={{width:'100%',height:38,background:'linear-gradient(135deg,#10b981,#059669)',color:'#fff',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'DM Sans,sans-serif',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          Fechar chamado
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p style={{fontSize:12.5,color:'#6b7280',marginBottom:10,lineHeight:1.5}}>Problema voltou? Reabra o chamado para notificar a equipe.</p>
+                        <button
+                          onClick={() => onStatusUpdate(ticket.id, 'open')}
+                          style={{width:'100%',height:38,background:'linear-gradient(135deg,#f59e0b,#d97706)',color:'#fff',border:'none',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'DM Sans,sans-serif',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.1"/></svg>
+                          Reabrir chamado
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="td-urgent-card">
+                  <p className="td-urgent-title">🔴 Precisa de ajuda urgente?</p>
+                  <p className="td-urgent-text">Entre em contato diretamente com o TI: <a className="td-urgent-link" href="mailto:suporteTi@email.com.br">suporteTi@email.com.br</a></p>
+                </div>
+              </>
             )}
           </div>
         </div>
