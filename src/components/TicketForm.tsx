@@ -9,6 +9,8 @@ export interface Ticket {
   status: 'open' | 'in-progress' | 'resolved' | 'closed';
   submittedBy: string;
   assignedTo?: string;
+  assetId?: number;
+  assetNome?: string;
   createdAt: Date;
   updatedAt: Date;
   comments: Array<{
@@ -20,9 +22,12 @@ export interface Ticket {
   }>;
 }
 
+interface AssetOption { id: number; nome: string; tipo: string; localizacao?: string; }
+
 interface TicketFormProps {
   onSubmit: (ticket: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'>) => void;
   userEmail: string;
+  assets?: AssetOption[];
 }
 
 const styles = `
@@ -174,6 +179,37 @@ const styles = `
   .tf-submit:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
   .tf-submit:active { transform: translateY(0); }
 
+
+  /* Asset selector */
+  .tf-asset-select-wrap { position: relative; }
+  .tf-asset-search {
+    width: 100%; padding: 10px 14px; border: 1.5px solid #e5e7eb; border-radius: 10px;
+    font-size: 14px; font-family: 'DM Sans', sans-serif; color: #111827; background: #fafbfc;
+    outline: none; transition: all 0.2s; box-sizing: border-box;
+  }
+  .tf-asset-search::placeholder { color: #c4c9d4; }
+  .tf-asset-search:focus { border-color: #6366f1; background: #fff; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+  .tf-asset-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff;
+    border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    z-index: 20; max-height: 200px; overflow-y: auto;
+  }
+  .tf-asset-option {
+    padding: 9px 14px; cursor: pointer; transition: background 0.15s;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .tf-asset-option:hover { background: #f7f8fc; }
+  .tf-asset-option-name { font-size: 13.5px; font-weight: 500; color: #111827; }
+  .tf-asset-option-meta { font-size: 11.5px; color: #9ca3af; }
+  .tf-asset-selected {
+    display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+    background: #eef2ff; border: 1.5px solid #c7d2fe; border-radius: 10px;
+    font-size: 13px; font-weight: 500; color: #4f46e5;
+  }
+  .tf-asset-clear { background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 16px; line-height: 1; padding: 0; margin-left: auto; }
+  .tf-asset-clear:hover { color: #374151; }
+  .tf-asset-none { padding: 10px 14px; font-size: 13px; color: #9ca3af; text-align: center; }
+
   @media (max-width: 600px) {
     .tf-row { grid-template-columns: 1fr; }
     .tf-priority-grid { grid-template-columns: repeat(2, 1fr); }
@@ -183,17 +219,21 @@ const styles = `
 
 const categories = ['Hardware', 'Software', 'Conexão com Internet', 'Acessos', 'Sistemas', 'Segurança', 'Impressora', 'Telefone/Celular', 'Outros'];
 
-export function TicketForm({ onSubmit, userEmail }: TicketFormProps) {
+export function TicketForm({ onSubmit, userEmail, assets = [] }: TicketFormProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [category, setCategory] = useState('');
+  const [assetId, setAssetId] = useState<number | undefined>(undefined);
+  const [assetNome, setAssetNome] = useState('');
+  const [assetSearch, setAssetSearch] = useState('');
+  const [assetDropdown, setAssetDropdown] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim() || !category) return;
-    onSubmit({ title: title.trim(), description: description.trim(), priority, category, submittedBy: userEmail });
-    setTitle(''); setDescription(''); setPriority('medium'); setCategory('');
+    onSubmit({ title: title.trim(), description: description.trim(), priority, category, submittedBy: userEmail, assetId, assetNome: assetNome || undefined });
+    setTitle(''); setDescription(''); setPriority('medium'); setCategory(''); setAssetId(undefined); setAssetNome(''); setAssetSearch('');
   };
 
   const priorities = [
@@ -243,6 +283,45 @@ export function TicketForm({ onSubmit, userEmail }: TicketFormProps) {
             <div className="tf-field">
               <label className="tf-label">Descrição detalhada <span>*</span></label>
               <textarea className="tf-textarea" value={description} onChange={e => setDescription(e.target.value)} placeholder="Descreva detalhadamente o que está ocorrendo, incluindo mensagens de erro, quando começou e qualquer informação relevante..." required />
+            </div>
+
+            {/* Asset selector */}
+            <div className="tf-field">
+              <label className="tf-label">Equipamento relacionado</label>
+              <div className="tf-asset-select-wrap">
+                {assetId ? (
+                  <div className="tf-asset-selected">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    {assetNome}
+                    <button type="button" className="tf-asset-clear" onClick={() => { setAssetId(undefined); setAssetNome(''); setAssetSearch(''); }}>×</button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      className="tf-asset-search"
+                      placeholder="Buscar equipamento (opcional)..."
+                      value={assetSearch}
+                      onChange={e => { setAssetSearch(e.target.value); setAssetDropdown(true); }}
+                      onFocus={() => setAssetDropdown(true)}
+                      onBlur={() => setTimeout(() => setAssetDropdown(false), 150)}
+                    />
+                    {assetDropdown && (
+                      <div className="tf-asset-dropdown">
+                        {assets.filter(a => !assetSearch || a.nome.toLowerCase().includes(assetSearch.toLowerCase())).length === 0 ? (
+                          <div className="tf-asset-none">Nenhum equipamento encontrado</div>
+                        ) : assets.filter(a => !assetSearch || a.nome.toLowerCase().includes(assetSearch.toLowerCase())).map(a => (
+                          <div key={a.id} className="tf-asset-option" onMouseDown={() => { setAssetId(a.id); setAssetNome(a.nome); setAssetDropdown(false); setAssetSearch(''); }}>
+                            <div>
+                              <div className="tf-asset-option-name">{a.nome}</div>
+                              <div className="tf-asset-option-meta">{a.tipo}{a.localizacao ? ` · ${a.localizacao}` : ''}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="tf-info">

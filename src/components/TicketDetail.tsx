@@ -437,6 +437,15 @@ export function TicketDetail({ ticket, userRole, userEmail, onBack, onAddComment
                     <div><p className="td-info-label">Responsável</p><p className="td-info-value" style={{color:'#6366f1'}}>{ticket.assignedTo.split('@')[0]}</p></div>
                   </div>
                 )}
+                {ticket.assetId && (
+                  <div className="td-info-row" style={{marginTop:4}}>
+                    <svg className="td-info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    <div>
+                      <p className="td-info-label">Equipamento</p>
+                      <p className="td-info-value" style={{color:'#0891b2', fontWeight:600}}>{ticket.assetNome || `Ativo #${ticket.assetId}`}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

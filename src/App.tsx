@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react';
+import { chamados as chamadosApi, ativos as ativosApi, setToken, STATUS_MAP, PRIORITY_MAP, STATUS_ID_MAP, PRIORITY_ID_MAP } from './api';
+import { AssetList, Asset } from './components/AssetList';
+import { AssetForm } from './components/AssetForm';
+import { AssetDetail } from './components/AssetDetail';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
 import { TicketForm, Ticket } from './components/TicketForm';
 import { TicketList } from './components/TicketList';
@@ -169,80 +173,155 @@ const appStyles = `
 `;
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userRole, setUserRole] = useState<'client' | 'it-executive'>('client');
-  const [userEmail, setUserEmail] = useState('');
-  const [userName, setUserName] = useState('');
-  const [activeView, setActiveView] = useState<'dashboard' | 'tickets' | 'submit' | 'detail'>('dashboard');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('auth_token'));
+  const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const [userRole, setUserRole] = useState<'client' | 'it-executive'>(() => (localStorage.getItem('auth_role') as any) || 'client');
+  const [userEmail, setUserEmail] = useState(() => localStorage.getItem('auth_email') || '');
+  const [userName, setUserName] = useState(() => localStorage.getItem('auth_name') || '');
+  const [activeView, setActiveView] = useState<'dashboard' | 'tickets' | 'submit' | 'detail' | 'assets' | 'asset-form' | 'asset-detail'>('dashboard');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
 
+  // Restore api.ts module token on page load (localStorage session restore)
   useEffect(() => {
-    const storedTickets = localStorage.getItem('tickets');
-    if (storedTickets) {
-      try {
-        const parsed = JSON.parse(storedTickets);
-        const ticketsWithDates = parsed.map((t: any) => ({
-          ...t,
-          createdAt: new Date(t.createdAt),
-          updatedAt: new Date(t.updatedAt),
-          comments: t.comments.map((c: any) => ({ ...c, timestamp: new Date(c.timestamp) }))
-        }));
-        setTickets(ticketsWithDates);
-      } catch { loadMockTickets(); }
-    } else {
-      loadMockTickets();
-    }
+    const stored = localStorage.getItem('auth_token');
+    if (stored) setToken(stored);
   }, []);
 
-  const loadMockTickets = () => {
-    const mockTickets: Ticket[] = [
-      { id: '1', title: 'Computador não inicia após atualização do Windows', description: 'Após a última atualização do Windows, aparece uma tela azul na inicialização.', priority: 'high', category: 'Hardware', status: 'open', submittedBy: 'user@company.com', assignedTo: 'john.doe@company.com', createdAt: new Date('2024-01-15T09:30:00'), updatedAt: new Date('2024-01-15T10:15:00'), comments: [] },
-      { id: '2', title: 'Sem acesso à pasta compartilhada na rede', description: 'Não consigo acessar a pasta \\server\\shared desde ontem.', priority: 'medium', category: 'Conexão com Internet', status: 'in-progress', submittedBy: 'alice.johnson@company.com', assignedTo: 'jane.smith@company.com', createdAt: new Date('2024-01-14T14:20:00'), updatedAt: new Date('2024-01-15T08:45:00'), comments: [] }
-    ];
-    setTickets(mockTickets);
-    localStorage.setItem('tickets', JSON.stringify(mockTickets));
+  // Load tickets and assets from API when authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !authToken) return;
+    loadData();
+  }, [isAuthenticated, authToken]);
+
+  const loadData = async () => {
+    setIsLoadingData(true);
+    try {
+      // Load tickets
+      const rawTickets = await chamadosApi.list();
+      const mapped: Ticket[] = rawTickets.map((t: any) => ({
+        id: String(t.id),
+        title: t.titulo,
+        description: t.descricao,
+        priority: PRIORITY_MAP[t.prioridade_id] || 'medium',
+        category: t.categoria || 'Outros',
+        status: STATUS_MAP[t.status_id] || 'open',
+        submittedBy: t.user_email || '',
+        assignedTo: t.assignedTo,
+        assetId: t.ativo_id,
+        assetNome: t.ativo_nome,
+        createdAt: new Date(t.created_at),
+        updatedAt: new Date(t.updated_at),
+        comments: [],
+      }));
+      setTickets(mapped);
+
+      // Load assets for all users (needed for ticket form dropdown)
+      try {
+        const rawAtivos = await ativosApi.list();
+        setAssets(rawAtivos as any);
+      } catch {
+        // Non-critical — just leave assets empty if it fails
+      }
+    } catch (err) {
+      console.error('Erro ao carregar dados:', err);
+    } finally {
+      setIsLoadingData(false);
+    }
   };
 
   if (!isAuthenticated) {
-    return <Login onLogin={(email, role, name) => { setUserEmail(email); setUserRole(role as any); setUserName(name); setIsAuthenticated(true); }} />;
+    return <Login onLogin={(email, role, name, token) => {
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('auth_role', role);
+      localStorage.setItem('auth_email', email);
+      localStorage.setItem('auth_name', name);
+      setUserEmail(email);
+      setUserRole(role as any);
+      setUserName(name);
+      setAuthToken(token);
+      setToken(token);
+      setIsAuthenticated(true);
+    }} />;
   }
 
-  const handleSubmitTicket = (ticketData: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'>) => {
-    const newTicket: Ticket = { ...ticketData, id: Date.now().toString(), status: 'open', createdAt: new Date(), updatedAt: new Date(), comments: [] };
-    const updated = [newTicket, ...tickets];
-    setTickets(updated);
-    localStorage.setItem('tickets', JSON.stringify(updated));
-    setActiveView('tickets');
-    toast.success('Chamado enviado com sucesso!');
+  const handleSubmitTicket = async (ticketData: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'>) => {
+    try {
+      await chamadosApi.create({
+        title: ticketData.title,
+        description: ticketData.description,
+        priority: ticketData.priority,
+        category: ticketData.category,
+      });
+      await loadData();
+      setActiveView('tickets');
+      toast.success('Chamado enviado com sucesso!');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao criar chamado.');
+    }
   };
 
-  const handleStatusUpdate = (ticketId: string, status: Ticket['status']) => {
-    const updated = tickets.map(t => t.id === ticketId ? { ...t, status, updatedAt: new Date() } : t);
-    setTickets(updated);
-    localStorage.setItem('tickets', JSON.stringify(updated));
-    if (selectedTicket?.id === ticketId) setSelectedTicket(prev => prev ? { ...prev, status, updatedAt: new Date() } : null);
-    toast.success('Status atualizado');
+  const handleStatusUpdate = async (ticketId: string, status: Ticket['status']) => {
+    try {
+      await chamadosApi.update(Number(ticketId), { status_id: STATUS_ID_MAP[status] });
+      const updated = tickets.map(t => t.id === ticketId ? { ...t, status, updatedAt: new Date() } : t);
+      setTickets(updated);
+      if (selectedTicket?.id === ticketId) setSelectedTicket(prev => prev ? { ...prev, status, updatedAt: new Date() } : null);
+      toast.success('Status atualizado');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao atualizar status.');
+    }
   };
 
   const handleAssignTicket = (ticketId: string, assignee: string) => {
     const updated = tickets.map(t => t.id === ticketId ? { ...t, assignedTo: assignee, updatedAt: new Date() } : t);
     setTickets(updated);
-    localStorage.setItem('tickets', JSON.stringify(updated));
     if (selectedTicket?.id === ticketId) setSelectedTicket(prev => prev ? { ...prev, assignedTo: assignee, updatedAt: new Date() } : null);
     toast.success('Chamado designado');
   };
 
-  const handleAddComment = (ticketId: string, comment: string, isInternal: boolean) => {
-    const newComment = { id: Date.now().toString(), author: userEmail, content: comment, timestamp: new Date(), isInternal };
-    const updated = tickets.map(t => t.id === ticketId ? { ...t, comments: [...t.comments, newComment], updatedAt: new Date() } : t);
-    setTickets(updated);
-    localStorage.setItem('tickets', JSON.stringify(updated));
-    if (selectedTicket?.id === ticketId) setSelectedTicket(prev => prev ? { ...prev, comments: [...prev.comments, newComment], updatedAt: new Date() } : null);
-    toast.success('Comentário adicionado!');
+  const handleAddComment = async (ticketId: string, comment: string, isInternal: boolean) => {
+    try {
+      await chamadosApi.postMensagem(Number(ticketId), comment, isInternal);
+      // Reload messages for the selected ticket
+      const msgs = await chamadosApi.listMensagens(Number(ticketId));
+      const mapped = msgs.map((m: any) => ({
+        id: String(m.id),
+        author: m.author_email || m.author_name,
+        content: m.mensagem,
+        timestamp: new Date(m.enviado_em),
+        isInternal: m.is_internal,
+      }));
+      const updated = tickets.map(t => t.id === ticketId ? { ...t, comments: mapped, updatedAt: new Date() } : t);
+      setTickets(updated);
+      if (selectedTicket?.id === ticketId) setSelectedTicket(prev => prev ? { ...prev, comments: mapped, updatedAt: new Date() } : null);
+      toast.success('Comentário adicionado!');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao enviar comentário.');
+    }
   };
 
-  const handleTicketSelect = (ticket: Ticket) => { setSelectedTicket(ticket); setActiveView('detail'); };
+  const handleTicketSelect = async (ticket: Ticket) => {
+    setSelectedTicket(ticket);
+    setActiveView('detail');
+    // Load messages from API
+    try {
+      const msgs = await chamadosApi.listMensagens(Number(ticket.id));
+      const mapped = msgs.map((m: any) => ({
+        id: String(m.id),
+        author: m.author_email || m.author_name,
+        content: m.mensagem,
+        timestamp: new Date(m.enviado_em),
+        isInternal: m.is_internal,
+      }));
+      setSelectedTicket(prev => prev ? { ...prev, comments: mapped } : null);
+    } catch (err) {
+      console.error('Erro ao carregar mensagens:', err);
+    }
+  };
 
   // ── Helpers ──────────────────────────────────────────
   const statusLabel = (s: string) => ({ open: 'Aberto', 'in-progress': 'Em Progresso', resolved: 'Resolvido', closed: 'Fechado' }[s] || s);
@@ -579,6 +658,12 @@ export default function App() {
                 {userRole === 'client' && (
                   <button className={`nav-btn ${activeView === 'submit' ? 'active' : ''}`} onClick={() => setActiveView('submit')}>Enviar Chamado</button>
                 )}
+                {userRole === 'it-executive' && (
+                  <button className={`nav-btn ${activeView === 'assets' || activeView === 'asset-form' || activeView === 'asset-detail' ? 'active' : ''}`} onClick={() => setActiveView('assets')}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline',marginRight:5,verticalAlign:'middle'}}><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    Ativos
+                  </button>
+                )}
               </nav>
             </div>
             <div className="header-right">
@@ -586,7 +671,7 @@ export default function App() {
                 {userRole === 'client' ? 'Usuário' : 'Analista TI'}
               </span>
               <span className="welcome-badge">Bem-vindo, <strong>{userName}</strong></span>
-              <button className="btn-ghost" onClick={() => setIsAuthenticated(false)}>Sair</button>
+              <button className="btn-ghost" onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_role'); localStorage.removeItem('auth_email'); localStorage.removeItem('auth_name'); setIsAuthenticated(false); setAuthToken(null); setToken(null); setTickets([]); setAssets([]); }}>Sair</button>
             </div>
           </div>
         </header>
@@ -597,10 +682,48 @@ export default function App() {
             <TicketList tickets={tickets} userRole={userRole} userEmail={userEmail} onTicketSelect={handleTicketSelect} onStatusUpdate={handleStatusUpdate} onAssignTicket={handleAssignTicket} />
           )}
           {activeView === 'submit' && userRole === 'client' && (
-            <TicketForm onSubmit={handleSubmitTicket} userEmail={userEmail} />
+            <TicketForm onSubmit={handleSubmitTicket} userEmail={userEmail} assets={assets.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, localizacao: a.localizacao }))} />
           )}
           {activeView === 'detail' && selectedTicket && (
             <TicketDetail ticket={selectedTicket} userRole={userRole} userEmail={userEmail} onBack={() => setActiveView('tickets')} onAddComment={handleAddComment} onStatusUpdate={handleStatusUpdate} onAssignTicket={handleAssignTicket} />
+          )}
+          {activeView === 'assets' && userRole === 'it-executive' && (
+            <AssetList
+              assets={assets}
+              onSelectAsset={(asset) => { setSelectedAsset(asset); setActiveView('asset-detail'); }}
+              onNewAsset={() => setActiveView('asset-form')}
+            />
+          )}
+          {activeView === 'asset-form' && userRole === 'it-executive' && (
+            <AssetForm
+              onSubmit={async (data) => {
+                try {
+                  await ativosApi.create(data as any);
+                  const refreshed = await ativosApi.list();
+                  setAssets(refreshed as any);
+                  setActiveView('assets');
+                  toast.success('Ativo cadastrado com sucesso!');
+                } catch (err: any) {
+                  toast.error(err.message || 'Erro ao cadastrar ativo.');
+                }
+              }}
+              onCancel={() => setActiveView('assets')}
+            />
+          )}
+          {activeView === 'asset-detail' && selectedAsset && userRole === 'it-executive' && (
+            <AssetDetail
+              asset={selectedAsset}
+              onBack={() => setActiveView('assets')}
+              onUpdated={(updated) => {
+                setAssets(prev => prev.map(a => a.id === updated.id ? updated : a));
+                setSelectedAsset(updated);
+              }}
+              onDeactivated={() => {
+                setAssets(prev => prev.filter(a => a.id !== selectedAsset.id));
+                setActiveView('assets');
+                toast.success('Ativo desativado.');
+              }}
+            />
           )}
         </main>
       </div>
