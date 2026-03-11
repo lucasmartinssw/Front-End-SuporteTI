@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { chamados as chamadosApi, ativos as ativosApi, users as usersApi, notificacoes as notificacoesApi, setToken, STATUS_MAP, PRIORITY_MAP, STATUS_ID_MAP, PRIORITY_ID_MAP, Notificacao } from './api';
 import { AssetList, Asset } from './components/AssetList';
 import { AssetForm } from './components/AssetForm';
@@ -216,6 +216,7 @@ export default function App() {
         tecnicos: (t.tecnicos || []) as {id: number; nome: string; email: string}[],
         assetId: t.ativo_id,
         assetNome: t.ativo_nome,
+        attachments: t.attachments || [],
         createdAt: new Date(t.created_at),
         updatedAt: new Date(t.updated_at),
         comments: [],
@@ -270,14 +271,19 @@ export default function App() {
     }} />;
   }
 
-  const handleSubmitTicket = async (ticketData: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'>) => {
+  const handleSubmitTicket = async (ticketData: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'>, files?: File[]) => {
     try {
-      await chamadosApi.create({
+      const payload = {
         title: ticketData.title,
         description: ticketData.description,
         priority: ticketData.priority,
         category: ticketData.category,
-      });
+      };
+      if (files?.length) {
+        await chamadosApi.createWithFiles(payload, files);
+      } else {
+        await chamadosApi.create(payload);
+      }
       await loadData();
       setActiveView('tickets');
       toast.success('Chamado enviado com sucesso!');
@@ -326,9 +332,9 @@ export default function App() {
     }
   };
 
-  const handleAddComment = async (ticketId: string, comment: string, isInternal: boolean) => {
+  const handleAddComment = async (ticketId: string, comment: string, isInternal: boolean, files?: File[]) => {
     try {
-      await chamadosApi.postMensagem(Number(ticketId), comment, isInternal);
+      await chamadosApi.postMensagem(Number(ticketId), comment, isInternal, files);
       // Reload messages for the selected ticket
       const msgs = await chamadosApi.listMensagens(Number(ticketId));
       const mapped = msgs.map((m: any) => ({
@@ -337,6 +343,7 @@ export default function App() {
         content: m.mensagem,
         timestamp: new Date(m.enviado_em),
         isInternal: m.is_internal,
+        attachments: m.attachments || [],
       }));
       const updated = tickets.map(t => t.id === ticketId ? { ...t, comments: mapped, updatedAt: new Date() } : t);
       setTickets(updated);
@@ -346,6 +353,24 @@ export default function App() {
       toast.error(err.message || 'Erro ao enviar comentário.');
     }
   };
+
+  const handleRefreshComments = useCallback(async (ticketId: string) => {
+    try {
+      const msgs = await chamadosApi.listMensagens(Number(ticketId));
+      const mapped = msgs.map((m: any) => ({
+        id: String(m.id),
+        author: m.author_email || m.author_name,
+        content: m.mensagem,
+        timestamp: new Date(m.enviado_em),
+        isInternal: m.is_internal,
+        attachments: m.attachments || [],
+      }));
+      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, comments: mapped } : t));
+      setSelectedTicket(prev => prev?.id === ticketId ? { ...prev, comments: mapped } : prev);
+    } catch {
+      // Silent — polling failure should not interrupt the user
+    }
+  }, []);
 
   const handleTicketSelect = async (ticket: Ticket) => {
     setSelectedTicket(ticket);
@@ -359,6 +384,7 @@ export default function App() {
         content: m.mensagem,
         timestamp: new Date(m.enviado_em),
         isInternal: m.is_internal,
+        attachments: m.attachments || [],
       }));
       setSelectedTicket(prev => prev ? { ...prev, comments: mapped } : null);
     } catch (err) {
@@ -779,7 +805,17 @@ export default function App() {
                         <p style={{textAlign:'center',padding:'24px 16px',fontSize:13,color:'#9ca3af'}}>Nenhuma notificação</p>
                       ) : notificacoes.map(n => (
                         <div key={n.id} style={{display:'flex',alignItems:'flex-start',gap:10,padding:'10px 16px',borderBottom:'1px solid #f7f8fc',cursor:'pointer'}}
-                          onClick={() => { const t = tickets.find(t => String(t.id) === String(n.chamado_id)); if(t){handleTicketSelect(t);} setShowNotifs(false); }}>
+                          onClick={async () => {
+                            const t = tickets.find(t => String(t.id) === String(n.chamado_id));
+                            if (t) {
+                              handleTicketSelect(t);
+                            } else {
+                              // Ticket not in current list — reload data then navigate
+                              await loadData();
+                              setActiveView('tickets');
+                            }
+                            setShowNotifs(false);
+                          }}>
                           <div style={{width:28,height:28,borderRadius:8,background: n.tipo==='ticket_created'?'#eef2ff':n.tipo==='status_change'?'#ecfdf5':'#fffbeb',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:2}}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={n.tipo==='ticket_created'?'#6366f1':n.tipo==='status_change'?'#10b981':'#f59e0b'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                               {n.tipo==='status_change' ? <path d="M20 6L9 17l-5-5"/> : n.tipo==='ticket_created' ? <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></> : <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>}
@@ -814,7 +850,7 @@ export default function App() {
             <TicketForm onSubmit={handleSubmitTicket} userEmail={userEmail} assets={assets.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, localizacao: a.localizacao }))} />
           )}
           {activeView === 'detail' && selectedTicket && (
-            <TicketDetail ticket={selectedTicket} userRole={userRole} userEmail={userEmail} technicians={technicians} onBack={() => setActiveView('tickets')} onAddComment={handleAddComment} onStatusUpdate={handleStatusUpdate} onAddTecnico={handleAddTecnico} onRemoveTecnico={handleRemoveTecnico} />
+            <TicketDetail ticket={selectedTicket} userRole={userRole} userEmail={userEmail} technicians={technicians} onBack={() => setActiveView('tickets')} onAddComment={handleAddComment} onRefreshComments={handleRefreshComments} onStatusUpdate={handleStatusUpdate} onAddTecnico={handleAddTecnico} onRemoveTecnico={handleRemoveTecnico} />
           )}
           {activeView === 'assets' && userRole === 'it-executive' && (
             <AssetList

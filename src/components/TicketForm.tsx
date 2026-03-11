@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 export interface Ticket {
   id: string;
@@ -11,6 +11,7 @@ export interface Ticket {
   tecnicos?: { id: number; nome: string; email: string }[];
   assetId?: number;
   assetNome?: string;
+  attachments?: Array<{ id: string; url: string; name: string; type: string }>;
   createdAt: Date;
   updatedAt: Date;
   comments: Array<{
@@ -19,13 +20,14 @@ export interface Ticket {
     content: string;
     timestamp: Date;
     isInternal: boolean;
+    attachments?: Array<{ id: string; url: string; name: string; type: string }>;
   }>;
 }
 
 interface AssetOption { id: number; nome: string; tipo: string; localizacao?: string; }
 
 interface TicketFormProps {
-  onSubmit: (ticket: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'>) => void;
+  onSubmit: (ticket: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'>, files?: File[]) => void;
   userEmail: string;
   assets?: AssetOption[];
 }
@@ -210,6 +212,48 @@ const styles = `
   .tf-asset-clear:hover { color: #374151; }
   .tf-asset-none { padding: 10px 14px; font-size: 13px; color: #9ca3af; text-align: center; }
 
+  /* File upload */
+  .tf-upload-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px;
+    border: 1.5px dashed #d1d5db;
+    border-radius: 10px;
+    background: #fafbfc;
+    cursor: pointer;
+    transition: all 0.18s;
+  }
+  .tf-upload-area:hover { border-color: #6366f1; background: #eef2ff; }
+  .tf-upload-area svg { flex-shrink: 0; }
+  .tf-upload-text { font-size: 13px; color: #6b7280; }
+  .tf-upload-text strong { color: #4f46e5; font-weight: 600; }
+  .tf-file-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .tf-file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 12px;
+    color: #374151;
+    font-weight: 500;
+    max-width: 220px;
+  }
+  .tf-file-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tf-file-chip-remove {
+    background: none; border: none; cursor: pointer;
+    color: #9ca3af; font-size: 14px; padding: 0; line-height: 1;
+    transition: color 0.15s;
+  }
+  .tf-file-chip-remove:hover { color: #ef4444; }
+  .tf-file-chip-thumb {
+    width: 28px; height: 28px; border-radius: 4px;
+    object-fit: cover; flex-shrink: 0;
+  }
+
   @media (max-width: 600px) {
     .tf-row { grid-template-columns: 1fr; }
     .tf-priority-grid { grid-template-columns: repeat(2, 1fr); }
@@ -228,12 +272,26 @@ export function TicketForm({ onSubmit, userEmail, assets = [] }: TicketFormProps
   const [assetNome, setAssetNome] = useState('');
   const [assetSearch, setAssetSearch] = useState('');
   const [assetDropdown, setAssetDropdown] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !description.trim() || !category) return;
-    onSubmit({ title: title.trim(), description: description.trim(), priority, category, submittedBy: userEmail, assetId, assetNome: assetNome || undefined });
-    setTitle(''); setDescription(''); setPriority('medium'); setCategory(''); setAssetId(undefined); setAssetNome(''); setAssetSearch('');
+    onSubmit({ title: title.trim(), description: description.trim(), priority, category, submittedBy: userEmail, assetId, assetNome: assetNome || undefined }, files.length > 0 ? files : undefined);
+    setTitle(''); setDescription(''); setPriority('medium'); setCategory(''); setAssetId(undefined); setAssetNome(''); setAssetSearch(''); setFiles([]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const priorities = [
@@ -322,6 +380,34 @@ export function TicketForm({ onSubmit, userEmail, assets = [] }: TicketFormProps
                   </>
                 )}
               </div>
+            </div>
+
+            {/* File upload */}
+            <div className="tf-field">
+              <label className="tf-label">Anexos</label>
+              <input ref={fileInputRef} type="file" multiple style={{display:'none'}} onChange={handleFileSelect} />
+              <div className="tf-upload-area" onClick={() => fileInputRef.current?.click()}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                <span className="tf-upload-text"><strong>Clique para anexar</strong> ou arraste arquivos aqui</span>
+              </div>
+              {files.length > 0 && (
+                <div className="tf-file-list">
+                  {files.map((file, idx) => {
+                    const isImage = file.type.startsWith('image/');
+                    return (
+                      <div key={idx} className="tf-file-chip">
+                        {isImage ? (
+                          <img className="tf-file-chip-thumb" src={URL.createObjectURL(file)} alt={file.name} />
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        )}
+                        <span className="tf-file-chip-name">{file.name}</span>
+                        <button type="button" className="tf-file-chip-remove" onClick={(e) => { e.stopPropagation(); removeFile(idx); }}>✕</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="tf-info">

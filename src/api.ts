@@ -169,6 +169,22 @@ export const chamados = {
       body: JSON.stringify(payload),
     }),
 
+  // Create ticket with optional file attachments (FormData)
+  createWithFiles: (payload: CreateChamadoPayload, files?: File[]) => {
+    const form = new FormData();
+    form.append('title', payload.title);
+    form.append('description', payload.description);
+    form.append('priority', payload.priority);
+    form.append('category', payload.category);
+    if (files?.length) {
+      files.forEach(f => form.append('files', f));
+    }
+    return request<{ message: string; id: number }>('/chamados', {
+      method: 'POST',
+      body: form,
+    });
+  },
+
   // Update status or priority (tech/admin only)
   update: (id: number, data: { status_id?: number; prioridade_id?: number; assigned_to?: number | null }) =>
     request<{ message: string }>(`/chamados/${id}`, {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Ticket } from './TicketForm';
 
 interface TicketDetailProps {
@@ -6,7 +6,8 @@ interface TicketDetailProps {
   userRole: 'client' | 'it-executive';
   userEmail: string;
   onBack: () => void;
-  onAddComment: (ticketId: string, comment: string, isInternal: boolean) => void;
+  onAddComment: (ticketId: string, comment: string, isInternal: boolean, files?: File[]) => void;
+  onRefreshComments: (ticketId: string) => void;
   onStatusUpdate: (ticketId: string, status: Ticket['status']) => void;
   technicians: { id: number; nome: string; email: string }[];
   onAddTecnico: (ticketId: string, userId: number) => void;
@@ -292,11 +293,143 @@ const styles = `
     .td-layout { grid-template-columns: 1fr; }
     .td-sidebar { order: -1; }
   }
+
+  /* Attachments */
+  .td-attachments { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+  .td-attach-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 8px 12px;
+    text-decoration: none;
+    color: #374151;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.18s;
+    max-width: 260px;
+    cursor: pointer;
+  }
+  .td-attach-item:hover { border-color: #6366f1; background: #eef2ff; color: #4f46e5; }
+  .td-attach-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .td-attach-img {
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+    max-width: 220px;
+    max-height: 160px;
+    object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .td-attach-img:hover { transform: scale(1.03); box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+  .td-msg-attachments { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .td-msg-attach-img {
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+    max-width: 180px;
+    max-height: 120px;
+    object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .td-msg-attach-img:hover { transform: scale(1.03); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .td-msg-attach-file {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 5px 10px;
+    text-decoration: none;
+    color: #374151;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.18s;
+  }
+  .td-msg-attach-file:hover { border-color: #6366f1; background: #eef2ff; color: #4f46e5; }
+
+  /* File upload in comment form */
+  .td-upload-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    border: 1.5px solid #e5e7eb;
+    background: #fafbfc;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.18s;
+    flex-shrink: 0;
+  }
+  .td-upload-btn:hover { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
+  .td-file-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .td-file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: #374151;
+    font-weight: 500;
+    max-width: 200px;
+  }
+  .td-file-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .td-file-chip-remove {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #9ca3af;
+    font-size: 14px;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .td-file-chip-remove:hover { color: #ef4444; }
+  .td-file-chip-thumb {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
 `;
 
-export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack, onAddComment, onStatusUpdate, onAddTecnico, onRemoveTecnico }: TicketDetailProps) {
+export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack, onAddComment, onRefreshComments, onStatusUpdate, onAddTecnico, onRemoveTecnico }: TicketDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const commentsEndRef = useRef<HTMLDivElement>(null);
+  const prevCommentCount = useRef(ticket.comments.length);
+
+  // Polling: refresh comments every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      onRefreshComments(ticket.id);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [ticket.id, onRefreshComments]);
+
+  // Auto-scroll to bottom when new comments arrive
+  useEffect(() => {
+    if (ticket.comments.length > prevCommentCount.current) {
+      commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevCommentCount.current = ticket.comments.length;
+  }, [ticket.comments.length]);
 
   const formatDate = (d: Date) => new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
 
@@ -310,10 +443,23 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
   const visibleComments = ticket.comments.filter(c => userRole === 'it-executive' || !c.isInternal);
 
   const handleSend = () => {
-    if (!newComment.trim()) return;
-    onAddComment(ticket.id, newComment.trim(), isInternal);
+    if (!newComment.trim() && attachedFiles.length === 0) return;
+    onAddComment(ticket.id, newComment.trim(), isInternal, attachedFiles.length > 0 ? attachedFiles : undefined);
     setNewComment('');
     setIsInternal(false);
+    setAttachedFiles([]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setAttachedFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -346,6 +492,23 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
               </div>
               <div className="td-card-body">
                 <p className="td-desc">{ticket.description}</p>
+                {ticket.attachments && ticket.attachments.length > 0 && (
+                  <div className="td-attachments">
+                    {ticket.attachments.map(att => {
+                      const isImage = att.type?.startsWith('image/');
+                      return isImage ? (
+                        <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer">
+                          <img className="td-attach-img" src={att.url} alt={att.name} />
+                        </a>
+                      ) : (
+                        <a key={att.id} className="td-attach-item" href={att.url} target="_blank" rel="noopener noreferrer">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                          <span className="td-attach-name">{att.name}</span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -360,7 +523,7 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
                   <p className="td-empty-comments">Nenhum comentário ainda. Seja o primeiro a comentar!</p>
                 ) : (
                   <div className="td-comment-list">
-                    {visibleComments.map(comment => {
+                    {visibleComments.map((comment, _idx) => {
                       const isMe = comment.author === userEmail;
                       return (
                         <div key={comment.id} className="td-comment">
@@ -374,10 +537,28 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
                               <span className="td-comment-time">{formatDate(comment.timestamp)}</span>
                             </div>
                             <p className="td-comment-text">{comment.content}</p>
+                            {comment.attachments && comment.attachments.length > 0 && (
+                              <div className="td-msg-attachments">
+                                {comment.attachments.map(att => {
+                                  const isImage = att.type?.startsWith('image/');
+                                  return isImage ? (
+                                    <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer">
+                                      <img className="td-msg-attach-img" src={att.url} alt={att.name} />
+                                    </a>
+                                  ) : (
+                                    <a key={att.id} className="td-msg-attach-file" href={att.url} target="_blank" rel="noopener noreferrer">
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                                      <span>{att.name}</span>
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
                     })}
+                    <div ref={commentsEndRef} />
                   </div>
                 )}
 
@@ -390,14 +571,49 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
                     rows={3}
                     onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSend(); }}
                   />
+                  {attachedFiles.length > 0 && (
+                    <div className="td-file-preview">
+                      {attachedFiles.map((file, idx) => {
+                        const isImage = file.type.startsWith('image/');
+                        return (
+                          <div key={idx} className="td-file-chip">
+                            {isImage ? (
+                              <img className="td-file-chip-thumb" src={URL.createObjectURL(file)} alt={file.name} />
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            )}
+                            <span className="td-file-chip-name">{file.name}</span>
+                            <button className="td-file-chip-remove" onClick={() => removeFile(idx)}>✕</button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div className="td-comment-actions">
-                    {userRole === 'it-executive' ? (
-                      <label className="td-internal-toggle">
-                        <input type="checkbox" checked={isInternal} onChange={e => setIsInternal(e.target.checked)} />
-                        Comentário interno (só visível para o TI)
-                      </label>
-                    ) : <div />}
-                    <button className="td-btn-send" onClick={handleSend} disabled={!newComment.trim()}>
+                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                      {userRole === 'it-executive' && (
+                        <label className="td-internal-toggle">
+                          <input type="checkbox" checked={isInternal} onChange={e => setIsInternal(e.target.checked)} />
+                          Interno
+                        </label>
+                      )}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        style={{display:'none'}}
+                        onChange={handleFileSelect}
+                      />
+                      <button
+                        type="button"
+                        className="td-upload-btn"
+                        title="Anexar arquivo"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                      </button>
+                    </div>
+                    <button className="td-btn-send" onClick={handleSend} disabled={!newComment.trim() && attachedFiles.length === 0}>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                       Comentar
                     </button>
