@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { chamados as chamadosApi, ativos as ativosApi, users as usersApi, notificacoes as notificacoesApi, setToken, STATUS_MAP, PRIORITY_MAP, STATUS_ID_MAP, PRIORITY_ID_MAP, Notificacao } from './api';
-import { AssetList, Asset } from './components/AssetList';
-import { AssetForm } from './components/AssetForm';
-import { AssetDetail } from './components/AssetDetail';
+import { AssetList, Asset } from './components/AssetList/AssetList';
+import { AssetForm } from './components/AssetForm/AssetForm';
+import { AssetDetail } from './components/AssetDetail/AssetDetail';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
-import { TicketForm, Ticket } from './components/TicketForm';
-import { TicketList } from './components/TicketList';
-import { TicketDetail } from './components/TicketDetail';
+import { TicketForm, Ticket } from './components/TicketForm/TicketForm';
+import { TicketList } from './components/TicketList/TicketList';
+import { TicketDetail } from './components/TicketDetail/TicketDetail';
 import { toast, Toaster } from 'sonner';
-import { Login } from './components/Login';
+import { Login } from './components/Login/Login';
 
 
 

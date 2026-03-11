@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import './TicketForm.css';
 
 export interface Ticket {
   id: string;
@@ -309,7 +310,6 @@ export function TicketForm({ onSubmit, userEmail, assets = [] }: TicketFormProps
 
   return (
     <>
-      <style>{styles}</style>
       <div className="tf-wrap">
         <div className="tf-heading">
           <h1 className="tf-title">Novo Chamado</h1>

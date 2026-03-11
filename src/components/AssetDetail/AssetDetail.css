@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=DM+Sans:wght@400;500&display=swap');
+@keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+.ad-wrap { animation: fadeUp 0.3s ease both; }
+.ad-back { display:flex; align-items:center; gap:6px; background:none; border:none; font-family:'DM Sans',sans-serif; font-size:13.5px; font-weight:500; color:#6b7280; cursor:pointer; padding:0; margin-bottom:24px; transition:color 0.15s; }
+.ad-back:hover { color:#111827; }
+
+.ad-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; }
+.ad-title-row { display:flex; align-items:center; gap:14px; }
+.ad-icon { width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg,#eef2ff,#e0e7ff); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.ad-title { font-family:'Sora',sans-serif; font-size:22px; font-weight:700; color:#0f1117; letter-spacing:-0.4px; margin-bottom:4px; }
+.ad-tipo { font-size:13px; color:#9ca3af; }
+.ad-actions { display:flex; gap:10px; }
+
+.ad-btn { display:flex; align-items:center; gap:6px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; padding:8px 16px; border-radius:9px; cursor:pointer; transition:all 0.18s; border:none; }
+.ad-btn-edit { background:#eef2ff; color:#4f46e5; }
+.ad-btn-edit:hover { background:#e0e7ff; }
+.ad-btn-save { background:linear-gradient(135deg,#4f46e5,#6366f1); color:#fff; box-shadow:0 3px 10px rgba(99,102,241,0.3); }
+.ad-btn-save:hover { transform:translateY(-1px); box-shadow:0 5px 16px rgba(99,102,241,0.4); }
+.ad-btn-save:disabled { opacity:0.55; cursor:not-allowed; transform:none; }
+.ad-btn-cancel { background:#f3f4f6; color:#374151; }
+.ad-btn-cancel:hover { background:#e5e7eb; }
+.ad-btn-danger { background:#fef2f2; color:#dc2626; }
+.ad-btn-danger:hover { background:#fee2e2; }
+
+.ad-grid { display:grid; grid-template-columns:1fr 340px; gap:20px; }
+@media (max-width:900px) { .ad-grid { grid-template-columns:1fr; } }
+
+.ad-card { background:#fff; border:1px solid #f0f1f5; border-radius:14px; overflow:hidden; }
+.ad-card-hdr { padding:14px 20px; border-bottom:1px solid #f7f8fc; display:flex; align-items:center; justify-content:space-between; }
+.ad-card-title { font-family:'Sora',sans-serif; font-size:13px; font-weight:600; color:#111827; }
+.ad-card-body { padding:20px; }
+
+.ad-field { margin-bottom:18px; }
+.ad-field:last-child { margin-bottom:0; }
+.ad-label { font-size:11.5px; font-weight:600; color:#9ca3af; text-transform:uppercase; letter-spacing:0.7px; margin-bottom:5px; }
+.ad-value { font-size:14px; color:#111827; font-weight:500; }
+.ad-value-empty { font-size:13.5px; color:#d1d5db; font-style:italic; }
+
+.ad-input { width:100%; height:40px; background:#f9fafb; border:1.5px solid #e5e7eb; border-radius:9px; padding:0 12px; font-size:13.5px; font-family:'DM Sans',sans-serif; color:#111827; outline:none; transition:all 0.18s; box-sizing:border-box; }
+.ad-input:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,0.1); background:#fff; }
+.ad-textarea { width:100%; min-height:80px; background:#f9fafb; border:1.5px solid #e5e7eb; border-radius:9px; padding:10px 12px; font-size:13.5px; font-family:'DM Sans',sans-serif; color:#111827; outline:none; transition:all 0.18s; box-sizing:border-box; resize:vertical; }
+.ad-textarea:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,0.1); background:#fff; }
+.ad-select { width:100%; height:40px; background:#f9fafb; border:1.5px solid #e5e7eb; border-radius:9px; padding:0 12px; font-size:13.5px; font-family:'DM Sans',sans-serif; color:#111827; outline:none; cursor:pointer; }
+
+.ad-status-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+.ad-status-dot { width:6px; height:6px; border-radius:50%; }
+
+.ad-status-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.ad-status-btn { height:38px; border-radius:9px; border:1.5px solid #e5e7eb; background:#fff; font-size:12.5px; font-weight:500; font-family:'DM Sans',sans-serif; cursor:pointer; transition:all 0.18s; display:flex; align-items:center; justify-content:center; gap:6px; }
+.ad-status-btn.active { border-color:transparent; }
+.ad-status-btn:hover { border-color:#6366f1; }
+
+.ad-ticket-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #f7f8fc; }
+.ad-ticket-row:last-child { border-bottom:none; }
+.ad-ticket-icon { width:28px; height:28px; border-radius:8px; background:#eef2ff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.ad-ticket-title { font-size:12.5px; font-weight:500; color:#111827; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ad-ticket-meta { font-size:11px; color:#9ca3af; }
+.ad-empty-tickets { text-align:center; padding:24px; font-size:13px; color:#9ca3af; }
+
+.ad-error { background:#fef2f2; border:1px solid #fca5a5; border-radius:9px; padding:10px 14px; font-size:13px; color:#991b1b; margin-bottom:16px; }
+
+.ad-confirm-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index:100; }
+.ad-confirm-box { background:#fff; border-radius:16px; padding:28px; max-width:360px; width:90%; box-shadow:0 20px 60px rgba(0,0,0,0.15); }
+.ad-confirm-title { font-family:'Sora',sans-serif; font-size:17px; font-weight:700; color:#0f1117; margin-bottom:8px; }
+.ad-confirm-sub { font-size:13.5px; color:#6b7280; margin-bottom:22px; line-height:1.5; }
+.ad-confirm-btns { display:flex; gap:10px; justify-content:flex-end; }

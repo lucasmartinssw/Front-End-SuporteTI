@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import './AssetList.css';
 
 export interface Asset {
   id: number;
@@ -22,97 +23,6 @@ interface AssetListProps {
   onSelectAsset: (asset: Asset) => void;
   onNewAsset: () => void;
 }
-
-const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=DM+Sans:wght@400;500&display=swap');
-
-  @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-  .al-wrap { animation: fadeUp 0.3s ease both; }
-
-  .al-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
-  .al-title { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 700; color: #0f1117; letter-spacing: -0.4px; margin-bottom: 4px; }
-  .al-sub { font-size: 13.5px; color: #9ca3af; }
-
-  .al-btn-primary {
-    display: flex; align-items: center; gap: 7px; font-family: 'DM Sans', sans-serif;
-    font-size: 13.5px; font-weight: 600; color: #fff;
-    background: linear-gradient(135deg, #4f46e5, #6366f1);
-    border: none; padding: 9px 18px; border-radius: 10px; cursor: pointer;
-    transition: all 0.2s; box-shadow: 0 3px 10px rgba(99,102,241,0.3);
-  }
-  .al-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(99,102,241,0.4); }
-
-  .al-filters {
-    display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
-  }
-
-  .al-filter-select {
-    padding: 8px 32px 8px 12px; border: 1.5px solid #e5e7eb; border-radius: 9px;
-    font-size: 13px; font-family: 'DM Sans', sans-serif; color: #374151;
-    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 10px center;
-    appearance: none; cursor: pointer; outline: none; transition: border-color 0.18s;
-  }
-  .al-filter-select:focus { border-color: #6366f1; }
-
-  .al-search {
-    flex: 1; min-width: 180px; padding: 8px 14px; border: 1.5px solid #e5e7eb; border-radius: 9px;
-    font-size: 13px; font-family: 'DM Sans', sans-serif; color: #374151; background: #fff; outline: none;
-    transition: border-color 0.18s;
-  }
-  .al-search:focus { border-color: #6366f1; }
-  .al-search::placeholder { color: #c4c9d4; }
-
-  /* Stats row */
-  .al-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
-  .al-stat {
-    background: #fff; border: 1px solid #f0f1f5; border-radius: 12px; padding: 16px 18px;
-    display: flex; align-items: center; gap: 12px;
-  }
-  .al-stat-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .al-stat-label { font-size: 11px; font-weight: 500; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 2px; }
-  .al-stat-value { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 700; color: #0f1117; letter-spacing: -0.5px; }
-
-  /* Table */
-  .al-table-wrap { background: #fff; border: 1px solid #f0f1f5; border-radius: 14px; overflow: hidden; }
-  .al-table { width: 100%; border-collapse: collapse; }
-  .al-table th {
-    text-align: left; font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase;
-    letter-spacing: 0.7px; padding: 12px 18px; background: #fafbfc; border-bottom: 1px solid #f0f1f5;
-  }
-  .al-table td { padding: 13px 18px; border-bottom: 1px solid #f7f8fc; font-size: 13.5px; color: #374151; vertical-align: middle; }
-  .al-table tr:last-child td { border-bottom: none; }
-  .al-table tr:hover td { background: #fafbfc; cursor: pointer; }
-
-  .al-tipo-badge {
-    display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px;
-    background: #f3f4f6; color: #374151; border-radius: 20px; font-size: 11.5px; font-weight: 500;
-  }
-
-  .al-status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 600; }
-  .al-status-badge .dot { width: 6px; height: 6px; border-radius: 50%; }
-  .s-ativo { background: #ecfdf5; color: #065f46; }
-  .s-ativo .dot { background: #10b981; }
-  .s-manutencao { background: #fff7ed; color: #9a3412; }
-  .s-manutencao .dot { background: #f97316; }
-  .s-reserva { background: #eff6ff; color: #1d4ed8; }
-  .s-reserva .dot { background: #3b82f6; }
-  .s-desativado { background: #f3f4f6; color: #6b7280; }
-  .s-desativado .dot { background: #9ca3af; }
-
-  .al-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 56px 32px; }
-  .al-empty-icon { width: 52px; height: 52px; background: #eef2ff; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
-  .al-empty-title { font-family: 'Sora', sans-serif; font-size: 16px; font-weight: 600; color: #111827; margin-bottom: 5px; }
-  .al-empty-sub { font-size: 13px; color: #9ca3af; }
-
-  .al-ticket-count { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #6b7280; background: #f3f4f6; padding: 2px 8px; border-radius: 20px; }
-
-  @media (max-width: 900px) {
-    .al-stats { grid-template-columns: repeat(2, 1fr); }
-    .al-table th:nth-child(3), .al-table td:nth-child(3),
-    .al-table th:nth-child(5), .al-table td:nth-child(5) { display: none; }
-  }
-`;
 
 const TIPO_LABELS: Record<string, string> = {
   computador: 'Computador', monitor: 'Monitor', impressora: 'Impressora',
@@ -165,7 +75,6 @@ export function AssetList({ assets, onSelectAsset, onNewAsset }: AssetListProps)
 
   return (
     <>
-      <style>{styles}</style>
       <div className="al-wrap">
         <div className="al-header">
           <div>
