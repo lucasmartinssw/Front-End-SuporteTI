@@ -17,6 +17,7 @@ interface TicketDetailProps {
   assets?: Asset[];
   onAssetLinked?: (assetId: number) => void;
   onAssetUnlinked?: (assetId: number) => void;
+  onShowHistory?: () => void;
 }
 
 const styles = `
@@ -412,7 +413,7 @@ const styles = `
   }
 `;
 
-export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack, onAddComment, onRefreshComments, onStatusUpdate, onAddTecnico, onRemoveTecnico, assets = [], onAssetLinked, onAssetUnlinked }: TicketDetailProps) {
+export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack, onAddComment, onRefreshComments, onStatusUpdate, onAddTecnico, onRemoveTecnico, assets = [], onAssetLinked, onAssetUnlinked, onShowHistory }: TicketDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
@@ -528,10 +529,21 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
     <>
       <style>{styles}</style>
       <div className="td-root">
-        <button className="td-back" onClick={onBack}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          Voltar aos chamados
-        </button>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
+          <button className="td-back" style={{marginBottom:0}} onClick={onBack}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Voltar aos chamados
+          </button>
+          {onShowHistory && (
+            <button onClick={onShowHistory}
+              style={{display:'inline-flex',alignItems:'center',gap:6,height:34,padding:'0 14px',background:'#f7f8fc',border:'1px solid #f0f1f5',borderRadius:9,fontSize:12.5,fontWeight:600,color:'#6b7280',cursor:'pointer',fontFamily:'DM Sans,sans-serif',transition:'all 0.18s'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='#eef2ff';e.currentTarget.style.color='#6366f1';e.currentTarget.style.borderColor='#c7d2fe'}}
+              onMouseLeave={e=>{e.currentTarget.style.background='#f7f8fc';e.currentTarget.style.color='#6b7280';e.currentTarget.style.borderColor='#f0f1f5'}}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Histórico
+            </button>
+          )}
+        </div>
 
         <div className="td-header">
           <div className="td-badges">

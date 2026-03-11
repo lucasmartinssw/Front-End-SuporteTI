@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import iconImg from './assets/Icon test blue simple.png';
 import { chamados as chamadosApi, ativos as ativosApi, users as usersApi, notificacoes as notificacoesApi, setToken, STATUS_MAP, PRIORITY_MAP, STATUS_ID_MAP, PRIORITY_ID_MAP, Notificacao } from './api';
 import { AssetList, Asset } from './components/AssetList';
 import { AssetForm } from './components/AssetForm';
 import { AssetDetail } from './components/AssetDetail';
+import { AuditLog } from './components/AuditLog';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
 import { TicketForm, Ticket } from './components/TicketForm';
 import { TicketList } from './components/TicketList';
@@ -45,7 +47,7 @@ const appStyles = `
   .app-header-inner { max-width: 1200px; margin: 0 auto; padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between; }
   .header-left { display: flex; align-items: center; gap: 32px; }
   .logo { display: flex; align-items: center; gap: 9px; }
-  .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, #6366f1, #3b82f6); border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .logo-icon { width: 36px; height: 36px; border-radius: 9px; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
   .logo-text { font-family: 'Sora', sans-serif; font-size: 16px; font-weight: 600; color: #0f1117; letter-spacing: -0.3px; }
   .app-nav { display: flex; align-items: center; gap: 2px; }
   .nav-btn { font-family: 'DM Sans', sans-serif; font-size: 13.5px; font-weight: 500; color: #6b7280; background: none; border: none; padding: 6px 14px; border-radius: 8px; cursor: pointer; transition: all 0.18s; }
@@ -165,7 +167,7 @@ export default function App() {
   const [userRole, setUserRole] = useState<'client' | 'it-executive'>(() => (localStorage.getItem('auth_role') as any) || 'client');
   const [userEmail, setUserEmail] = useState(() => localStorage.getItem('auth_email') || '');
   const [userName, setUserName] = useState(() => localStorage.getItem('auth_name') || '');
-  const [activeView, setActiveView] = useState<'dashboard' | 'tickets' | 'submit' | 'detail' | 'assets' | 'asset-form' | 'asset-detail'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'tickets' | 'submit' | 'detail' | 'assets' | 'asset-form' | 'asset-detail' | 'audit-chamado' | 'audit-ativo'>('dashboard');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -744,10 +746,7 @@ export default function App() {
             <div className="header-left">
               <div className="logo">
                 <div className="logo-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="7" width="20" height="14" rx="2"/>
-                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-                  </svg>
+                  <img src={iconImg} alt="Suporte TI" style={{width:'100%',height:'100%',objectFit:'cover'}} />
                 </div>
                 <span className="logo-text">Suporte TI</span>
               </div>
@@ -864,6 +863,7 @@ export default function App() {
                   ? { ...a, chamados: (a.chamados || []).filter((c: any) => String(c.id) !== String(selectedTicket?.id)) }
                   : a));
               }}
+              onShowHistory={() => setActiveView('audit-chamado')}
             />
           )}
           {activeView === 'assets' && userRole === 'it-executive' && (
@@ -907,6 +907,23 @@ export default function App() {
                 const t = tickets.find(t => Number(t.id) === chamadoId);
                 if (t) { handleTicketSelect(t); }
               }}
+              onShowHistory={() => setActiveView('audit-ativo')}
+            />
+          )}
+          {activeView === 'audit-chamado' && selectedTicket && (
+            <AuditLog
+              type="chamado"
+              id={Number(selectedTicket.id)}
+              titulo={selectedTicket.title}
+              onBack={() => setActiveView('detail')}
+            />
+          )}
+          {activeView === 'audit-ativo' && selectedAsset && (
+            <AuditLog
+              type="ativo"
+              id={selectedAsset.id}
+              titulo={selectedAsset.nome}
+              onBack={() => setActiveView('asset-detail')}
             />
           )}
         </main>

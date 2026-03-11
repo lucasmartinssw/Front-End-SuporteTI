@@ -318,6 +318,23 @@ export interface Notificacao {
   created_at: string;
 }
 
+export interface AuditoriaEntry {
+  id: number;
+  acao: string;
+  detalhe: string;
+  created_at: string;
+  user_nome: string;
+  user_email: string;
+  user_cargo: string;
+}
+
+export const auditoria = {
+  getChamado: (chamadoId: number) =>
+    request<AuditoriaEntry[]>(`/auditoria/chamados/${chamadoId}`),
+  getAtivo: (ativoId: number) =>
+    request<AuditoriaEntry[]>(`/auditoria/ativos/${ativoId}`),
+};
+
 export const notificacoes = {
   list: () => request<Notificacao[]>('/notificacoes'),
   dismiss: (id: number) => request<{ message: string }>(`/notificacoes/${id}/lida`, { method: 'PATCH' }),

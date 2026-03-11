@@ -9,6 +9,7 @@ interface AssetDetailProps {
   onUpdated: (updated: Asset) => void;
   onDeactivated: () => void;
   onTicketSelect?: (chamadoId: number) => void;
+  onShowHistory?: () => void;
 }
 
 const TIPO_ICONS: Record<string, string> = {
@@ -33,7 +34,7 @@ const TIPO_LABELS: Record<string, string> = {
   telefone: 'Telefone', servidor: 'Servidor', switch: 'Switch', outro: 'Outro',
 };
 
-export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivated, onTicketSelect }: AssetDetailProps) {
+export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivated, onTicketSelect, onShowHistory }: AssetDetailProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
@@ -165,10 +166,21 @@ export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivat
 
       <div className="ad-wrap">
         {/* Back button */}
-        <button className="ad-back" onClick={onBack}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          Voltar para Ativos
-        </button>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'24px'}}>
+          <button className="ad-back" style={{marginBottom:0}} onClick={onBack}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            Voltar para Ativos
+          </button>
+          {onShowHistory && (
+            <button onClick={onShowHistory}
+              style={{display:'inline-flex',alignItems:'center',gap:6,height:34,padding:'0 14px',background:'#f7f8fc',border:'1px solid #f0f1f5',borderRadius:9,fontSize:12.5,fontWeight:600,color:'#6b7280',cursor:'pointer',fontFamily:'DM Sans,sans-serif',transition:'all 0.18s'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='#eef2ff';e.currentTarget.style.color='#6366f1';e.currentTarget.style.borderColor='#c7d2fe'}}
+              onMouseLeave={e=>{e.currentTarget.style.background='#f7f8fc';e.currentTarget.style.color='#6b7280';e.currentTarget.style.borderColor='#f0f1f5'}}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Histórico
+            </button>
+          )}
+        </div>
 
         {/* Header */}
         <div className="ad-header">

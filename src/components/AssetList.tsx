@@ -15,6 +15,7 @@ export interface Asset {
   created_at: string;
   updated_at: string;
   chamados?: any[];
+  chamados_count?: number;
 }
 
 interface AssetListProps {
@@ -260,7 +261,7 @@ export function AssetList({ assets, onSelectAsset, onNewAsset }: AssetListProps)
                     <td>
                       <span className="al-ticket-count">
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                        {asset.chamados?.length ?? 0}
+                        {asset.chamados_count ?? asset.chamados?.length ?? 0}
                       </span>
                     </td>
                   </tr>
