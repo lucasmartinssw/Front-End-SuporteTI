@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Asset } from './AssetList';
 import { ativos } from '../api';
 
 interface AssetDetailProps {
   asset: Asset;
+  technicians: { id: number; nome: string; email: string }[];
   onBack: () => void;
   onUpdated: (updated: Asset) => void;
   onDeactivated: () => void;
+  onTicketSelect?: (chamadoId: number) => void;
 }
 
 const TIPO_ICONS: Record<string, string> = {
@@ -31,12 +33,19 @@ const TIPO_LABELS: Record<string, string> = {
   telefone: 'Telefone', servidor: 'Servidor', switch: 'Switch', outro: 'Outro',
 };
 
-export function AssetDetail({ asset, onBack, onUpdated, onDeactivated }: AssetDetailProps) {
+export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivated, onTicketSelect }: AssetDetailProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+
+  // Full asset data (loaded from API to get chamados)
+  const [fullAsset, setFullAsset] = useState<Asset>(asset);
+
+  useEffect(() => {
+    ativos.get(asset.id).then(data => setFullAsset(data as any)).catch(() => {});
+  }, [asset.id]);
 
   // Edit form state
   const [nome, setNome] = useState(asset.nome);
@@ -45,6 +54,7 @@ export function AssetDetail({ asset, onBack, onUpdated, onDeactivated }: AssetDe
   const [patrimonio, setPatrimonio] = useState(asset.patrimonio || '');
   const [localizacao, setLocalizacao] = useState(asset.localizacao || '');
   const [status, setStatus] = useState(asset.status);
+  const [responsavelId, setResponsavelId] = useState<number | ''>(asset.responsavel_id || '');
   const [observacoes, setObservacoes] = useState(asset.observacoes || '');
 
   const statusCfg = STATUS_CONFIG[asset.status] || STATUS_CONFIG.ativo;
@@ -55,8 +65,9 @@ export function AssetDetail({ asset, onBack, onUpdated, onDeactivated }: AssetDe
     setIsSaving(true);
     setError(null);
     try {
-      await ativos.update(asset.id, { nome, tipo, numero_serie: numeroSerie || undefined, patrimonio: patrimonio || undefined, localizacao: localizacao || undefined, status, observacoes: observacoes || undefined });
-      onUpdated({ ...asset, nome, tipo, numero_serie: numeroSerie || undefined, patrimonio: patrimonio || undefined, localizacao: localizacao || undefined, status, observacoes: observacoes || undefined });
+      await ativos.update(asset.id, { nome, tipo, numero_serie: numeroSerie || undefined, patrimonio: patrimonio || undefined, localizacao: localizacao || undefined, status, responsavel_id: responsavelId || undefined, observacoes: observacoes || undefined });
+      const updatedTech = technicians.find(t => t.id === responsavelId);
+      onUpdated({ ...asset, nome, tipo, numero_serie: numeroSerie || undefined, patrimonio: patrimonio || undefined, localizacao: localizacao || undefined, status, responsavel_id: responsavelId || undefined, responsavel_nome: updatedTech?.nome, responsavel_email: updatedTech?.email, observacoes: observacoes || undefined });
       setIsEditing(false);
     } catch (err: any) {
       setError(err.message || 'Erro ao salvar.');
@@ -77,6 +88,8 @@ export function AssetDetail({ asset, onBack, onUpdated, onDeactivated }: AssetDe
   };
 
   const fmtDate = (s: string) => new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(s));
+
+
 
   return (
     <>
@@ -217,7 +230,7 @@ export function AssetDetail({ asset, onBack, onUpdated, onDeactivated }: AssetDe
                       { label: 'Número de Série', value: asset.numero_serie },
                       { label: 'Patrimônio', value: asset.patrimonio },
                       { label: 'Localização', value: asset.localizacao },
-                      { label: 'Responsável', value: asset.responsavel_nome || asset.responsavel_email },
+                      { label: 'Responsável', value: fullAsset.responsavel_nome || fullAsset.responsavel_email },
                     ].map(f => (
                       <div key={f.label} className="ad-field">
                         <p className="ad-label">{f.label}</p>
@@ -257,6 +270,15 @@ export function AssetDetail({ asset, onBack, onUpdated, onDeactivated }: AssetDe
                     <div className="ad-field">
                       <p className="ad-label">Localização</p>
                       <input className="ad-input" value={localizacao} onChange={e => setLocalizacao(e.target.value)} placeholder="Ex: Sala TI"/>
+                    </div>
+                    <div className="ad-field">
+                      <p className="ad-label">Responsável</p>
+                      <select className="ad-input" value={responsavelId} onChange={e => setResponsavelId(e.target.value ? Number(e.target.value) : '')}>
+                        <option value="">— Sem responsável —</option>
+                        {technicians.map(t => (
+                          <option key={t.id} value={t.id}>{t.nome} ({t.email})</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="ad-field">
                       <p className="ad-label">Status</p>
@@ -311,15 +333,17 @@ export function AssetDetail({ asset, onBack, onUpdated, onDeactivated }: AssetDe
               <div className="ad-card-hdr">
                 <span className="ad-card-title">Chamados vinculados</span>
                 <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>
-                  {asset.chamados?.length || 0} total
+                  {fullAsset.chamados?.length || 0} total
                 </span>
               </div>
               <div className="ad-card-body" style={{ padding: '8px 16px' }}>
-                {!asset.chamados || asset.chamados.length === 0 ? (
+                {!fullAsset.chamados || fullAsset.chamados.length === 0 ? (
                   <p className="ad-empty-tickets">Nenhum chamado vinculado a este ativo.</p>
                 ) : (
-                  asset.chamados.map((c: any) => (
-                    <div key={c.id} className="ad-ticket-row">
+                  fullAsset.chamados.map((c: any) => (
+                    <div key={c.id} className="ad-ticket-row"
+                      onClick={() => onTicketSelect && onTicketSelect(c.id)}
+                      style={{ cursor: onTicketSelect ? 'pointer' : 'default' }}>
                       <div className="ad-ticket-icon">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                       </div>
@@ -327,6 +351,7 @@ export function AssetDetail({ asset, onBack, onUpdated, onDeactivated }: AssetDe
                         <p className="ad-ticket-title">{c.titulo}</p>
                         <p className="ad-ticket-meta">{c.status} · {c.solicitante || 'N/A'}</p>
                       </div>
+                      {onTicketSelect && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>}
                     </div>
                   ))
                 )}

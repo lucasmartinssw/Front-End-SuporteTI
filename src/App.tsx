@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { chamados as chamadosApi, ativos as ativosApi, users as usersApi, notificacoes as notificacoesApi, setToken, STATUS_MAP, PRIORITY_MAP, STATUS_ID_MAP, PRIORITY_ID_MAP, Notificacao } from './api';
 import { AssetList, Asset } from './components/AssetList';
 import { AssetForm } from './components/AssetForm';
@@ -231,15 +231,6 @@ export default function App() {
         // Non-critical — just leave assets empty if it fails
       }
 
-      // Load technicians for assignment dropdown
-      try {
-        const techs = await users.list('tecnico');
-        const admins = await users.list('admin');
-        setTechnicians([...techs, ...admins]);
-      } catch {
-        // Non-critical
-      }
-
       // Load technicians list (for assignment dropdown)
       try {
         const rawTechs = await usersApi.list('tecnico');
@@ -354,7 +345,7 @@ export default function App() {
     }
   };
 
-  const handleRefreshComments = useCallback(async (ticketId: string) => {
+  const handleRefreshComments = async (ticketId: string) => {
     try {
       const msgs = await chamadosApi.listMensagens(Number(ticketId));
       const mapped = msgs.map((m: any) => ({
@@ -370,7 +361,7 @@ export default function App() {
     } catch {
       // Silent — polling failure should not interrupt the user
     }
-  }, []);
+  };
 
   const handleTicketSelect = async (ticket: Ticket) => {
     setSelectedTicket(ticket);
@@ -850,7 +841,30 @@ export default function App() {
             <TicketForm onSubmit={handleSubmitTicket} userEmail={userEmail} assets={assets.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, localizacao: a.localizacao }))} />
           )}
           {activeView === 'detail' && selectedTicket && (
-            <TicketDetail ticket={selectedTicket} userRole={userRole} userEmail={userEmail} technicians={technicians} onBack={() => setActiveView('tickets')} onAddComment={handleAddComment} onRefreshComments={handleRefreshComments} onStatusUpdate={handleStatusUpdate} onAddTecnico={handleAddTecnico} onRemoveTecnico={handleRemoveTecnico} />
+            <TicketDetail
+              ticket={selectedTicket}
+              userRole={userRole}
+              userEmail={userEmail}
+              technicians={technicians}
+              assets={assets}
+              onBack={() => setActiveView('tickets')}
+              onAddComment={handleAddComment}
+              onRefreshComments={handleRefreshComments}
+              onStatusUpdate={handleStatusUpdate}
+              onAddTecnico={handleAddTecnico}
+              onRemoveTecnico={handleRemoveTecnico}
+              onAssetLinked={async (assetId) => {
+                try {
+                  const updated = await ativosApi.get(assetId);
+                  setAssets(prev => prev.map(a => a.id === assetId ? { ...a, chamados: (updated as any).chamados } : a));
+                } catch {}
+              }}
+              onAssetUnlinked={(assetId) => {
+                setAssets(prev => prev.map(a => a.id === assetId
+                  ? { ...a, chamados: (a.chamados || []).filter((c: any) => String(c.id) !== String(selectedTicket?.id)) }
+                  : a));
+              }}
+            />
           )}
           {activeView === 'assets' && userRole === 'it-executive' && (
             <AssetList
@@ -878,15 +892,20 @@ export default function App() {
           {activeView === 'asset-detail' && selectedAsset && userRole === 'it-executive' && (
             <AssetDetail
               asset={selectedAsset}
+              technicians={technicians}
               onBack={() => setActiveView('assets')}
               onUpdated={(updated) => {
                 setAssets(prev => prev.map(a => a.id === updated.id ? updated : a));
                 setSelectedAsset(updated);
               }}
               onDeactivated={() => {
-                setAssets(prev => prev.filter(a => a.id !== selectedAsset.id));
+                setAssets(prev => prev.map(a => a.id === selectedAsset.id ? { ...a, status: 'desativado' } : a));
                 setActiveView('assets');
                 toast.success('Ativo desativado.');
+              }}
+              onTicketSelect={(chamadoId) => {
+                const t = tickets.find(t => Number(t.id) === chamadoId);
+                if (t) { handleTicketSelect(t); }
               }}
             />
           )}

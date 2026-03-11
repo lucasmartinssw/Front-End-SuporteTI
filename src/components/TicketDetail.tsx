@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Ticket } from './TicketForm';
+import { ativos as ativosApi, chamados as chamadosApi } from '../api';
+import { Asset } from './AssetList';
 
 interface TicketDetailProps {
   ticket: Ticket;
@@ -12,6 +14,9 @@ interface TicketDetailProps {
   technicians: { id: number; nome: string; email: string }[];
   onAddTecnico: (ticketId: string, userId: number) => void;
   onRemoveTecnico: (ticketId: string, userId: number) => void;
+  assets?: Asset[];
+  onAssetLinked?: (assetId: number) => void;
+  onAssetUnlinked?: (assetId: number) => void;
 }
 
 const styles = `
@@ -407,7 +412,7 @@ const styles = `
   }
 `;
 
-export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack, onAddComment, onRefreshComments, onStatusUpdate, onAddTecnico, onRemoveTecnico }: TicketDetailProps) {
+export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack, onAddComment, onRefreshComments, onStatusUpdate, onAddTecnico, onRemoveTecnico, assets = [], onAssetLinked, onAssetUnlinked }: TicketDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
@@ -433,12 +438,69 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
 
   const formatDate = (d: Date) => new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
 
+  // Asset link state
+  const [linkingAsset, setLinkingAsset] = useState(false);
+  const [selectedAssetId, setSelectedAssetId] = useState<string>('');
+  const [isLinkingAsset, setIsLinkingAsset] = useState(false);
+  const [linkedAssets, setLinkedAssets] = useState<{id:number;nome:string;tipo:string}[]>(
+    ticket.assetId ? [{ id: ticket.assetId, nome: ticket.assetNome || `Ativo #${ticket.assetId}`, tipo: '' }] : []
+  );
+  const [unlinkingAssetId, setUnlinkingAssetId] = useState<number | null>(null);
+
+  const linkedAssetIds = new Set(linkedAssets.map(a => a.id));
+  const availableAssets = assets.filter(a => !linkedAssetIds.has(a.id) && a.status !== 'desativado');
+
+  const handleLinkAsset = async () => {
+    if (!selectedAssetId) return;
+    setIsLinkingAsset(true);
+    try {
+      await ativosApi.linkChamado(Number(selectedAssetId), Number(ticket.id));
+      const asset = assets.find(a => a.id === Number(selectedAssetId));
+      if (asset) setLinkedAssets(prev => [...prev, { id: asset.id, nome: asset.nome, tipo: asset.tipo }]);
+      setSelectedAssetId('');
+      setLinkingAsset(false);
+      onAssetLinked && onAssetLinked(Number(selectedAssetId));
+    } catch (err: any) {
+      console.error('Erro ao vincular ativo:', err);
+    } finally {
+      setIsLinkingAsset(false);
+    }
+  };
+
+  const handleUnlinkAsset = async (assetId: number) => {
+    setUnlinkingAssetId(assetId);
+    try {
+      await ativosApi.unlinkChamado(assetId, Number(ticket.id));
+      setLinkedAssets(prev => prev.filter(a => a.id !== assetId));
+      onAssetUnlinked && onAssetUnlinked(assetId);
+    } catch (err: any) {
+      console.error('Erro ao desvincular ativo:', err);
+    } finally {
+      setUnlinkingAssetId(null);
+    }
+  };
+
   const getStatusClass = (s: string) => ({ open: 'badge-open', 'in-progress': 'badge-in-progress', resolved: 'badge-resolved', closed: 'badge-closed' }[s] || 'badge-closed');
   const getStatusLabel = (s: string) => ({ open: 'Aberto', 'in-progress': 'Em Progresso', resolved: 'Resolvido', closed: 'Fechado' }[s] || s);
   const getPriorityClass = (p: string) => ({ urgent: 'badge-urgent', high: 'badge-high', medium: 'badge-medium', low: 'badge-low' }[p] || '');
   const getPriorityLabel = (p: string) => ({ urgent: 'Urgente', high: 'Alto', medium: 'Médio', low: 'Baixo' }[p] || p);
 
   const getInitials = (email: string) => email.split('@')[0].slice(0, 2).toUpperCase();
+
+  const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!window.confirm('Apagar esta mensagem?')) return;
+    setDeletingMsgId(commentId);
+    try {
+      await chamadosApi.deleteMensagem(Number(ticket.id), Number(commentId));
+      onRefreshComments(ticket.id);
+    } catch (err: any) {
+      console.error('Erro ao apagar mensagem:', err);
+    } finally {
+      setDeletingMsgId(null);
+    }
+  };
 
   const visibleComments = ticket.comments.filter(c => userRole === 'it-executive' || !c.isInternal);
 
@@ -535,6 +597,17 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
                               <span className="td-comment-author">{isMe ? 'Você' : comment.author.split('@')[0]}</span>
                               {comment.isInternal && userRole === 'it-executive' && <span className="td-internal-tag">Interno</span>}
                               <span className="td-comment-time">{formatDate(comment.timestamp)}</span>
+                              {userRole === 'it-executive' && (
+                                <button
+                                  onClick={() => handleDeleteComment(comment.id)}
+                                  disabled={deletingMsgId === comment.id}
+                                  title="Apagar mensagem"
+                                  style={{background:'none',border:'none',cursor:'pointer',color:'#d1d5db',fontSize:13,padding:'0 2px',lineHeight:1,marginLeft:4,flexShrink:0}}
+                                  onMouseEnter={e => (e.currentTarget.style.color='#ef4444')}
+                                  onMouseLeave={e => (e.currentTarget.style.color='#d1d5db')}>
+                                  {deletingMsgId === comment.id ? '...' : '✕'}
+                                </button>
+                              )}
                             </div>
                             <p className="td-comment-text">{comment.content}</p>
                             {comment.attachments && comment.attachments.length > 0 && (
@@ -673,6 +746,58 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
                 )}
               </div>
             </div>
+
+            {userRole === 'it-executive' && (
+              <div className="td-card" style={{marginBottom:'16px'}}>
+                <div className="td-card-header" style={{justifyContent:'space-between'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    <span className="td-card-title">Ativos vinculados</span>
+                  </div>
+                  {!linkingAsset && availableAssets.length > 0 && (
+                    <button onClick={() => setLinkingAsset(true)}
+                      style={{fontSize:11,color:'#6366f1',background:'none',border:'1px solid #e0e7ff',borderRadius:6,padding:'2px 8px',cursor:'pointer',fontWeight:600,fontFamily:'DM Sans,sans-serif'}}>
+                      + Vincular
+                    </button>
+                  )}
+                </div>
+                <div className="td-card-body" style={{padding:'10px 16px'}}>
+                  {linkingAsset && (
+                    <div style={{display:'flex',gap:6,marginBottom:8,alignItems:'center'}}>
+                      <select value={selectedAssetId} onChange={e => setSelectedAssetId(e.target.value)}
+                        style={{flex:1,height:32,border:'1.5px solid #e5e7eb',borderRadius:8,padding:'0 8px',fontSize:12,fontFamily:'DM Sans,sans-serif',color:'#111827',background:'#fff'}}>
+                        <option value="">Selecionar ativo...</option>
+                        {availableAssets.map(a => (
+                          <option key={a.id} value={a.id}>{a.nome}</option>
+                        ))}
+                      </select>
+                      <button onClick={handleLinkAsset} disabled={!selectedAssetId || isLinkingAsset}
+                        style={{height:32,padding:'0 10px',background:'#6366f1',color:'#fff',border:'none',borderRadius:8,fontSize:12,fontWeight:600,cursor:'pointer',opacity:(!selectedAssetId||isLinkingAsset)?0.6:1}}>
+                        {isLinkingAsset ? '...' : 'OK'}
+                      </button>
+                      <button onClick={() => { setLinkingAsset(false); setSelectedAssetId(''); }}
+                        style={{height:32,padding:'0 8px',background:'none',border:'1px solid #e5e7eb',borderRadius:8,fontSize:12,cursor:'pointer',color:'#6b7280'}}>
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                  {linkedAssets.length === 0 ? (
+                    <p style={{fontSize:12.5,color:'#9ca3af',textAlign:'center',padding:'8px 0'}}>Nenhum ativo vinculado.</p>
+                  ) : linkedAssets.map(a => (
+                    <div key={a.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',borderBottom:'1px solid #f7f8fc'}}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                      <span style={{flex:1,fontSize:12.5,color:'#111827',fontWeight:500}}>{a.nome}</span>
+                      <button onClick={() => handleUnlinkAsset(a.id)} disabled={unlinkingAssetId === a.id}
+                        style={{background:'none',border:'none',cursor:'pointer',color:'#d1d5db',fontSize:13,padding:'0 2px',lineHeight:1}}
+                        onMouseEnter={e => (e.currentTarget.style.color='#ef4444')}
+                        onMouseLeave={e => (e.currentTarget.style.color='#d1d5db')}>
+                        {unlinkingAssetId === a.id ? '...' : '✕'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {userRole === 'it-executive' && (
               <div className="td-card" style={{marginBottom:'16px'}}>

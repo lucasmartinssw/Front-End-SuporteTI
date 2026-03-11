@@ -193,6 +193,8 @@ export const chamados = {
     }),
 
   // Assign / remove technicians
+  deleteMensagem: (chamadoId: number, mensagemId: number) =>
+    request<{ message: string }>(`/chamados/${chamadoId}/mensagens/${mensagemId}`, { method: 'DELETE' }),
   addTecnico: (chamadoId: number, userId: number) =>
     request<{ message: string }>(`/chamados/${chamadoId}/tecnicos/${userId}`, { method: 'POST' }),
 
