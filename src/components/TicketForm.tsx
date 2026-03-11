@@ -27,7 +27,7 @@ export interface Ticket {
 interface AssetOption { id: number; nome: string; tipo: string; localizacao?: string; }
 
 interface TicketFormProps {
-  onSubmit: (ticket: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'>, files?: File[]) => void;
+  onSubmit: (ticket: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'>, files?: File[]) => void | Promise<void>;
   userEmail: string;
   assets?: AssetOption[];
 }
@@ -273,14 +273,20 @@ export function TicketForm({ onSubmit, userEmail, assets = [] }: TicketFormProps
   const [assetSearch, setAssetSearch] = useState('');
   const [assetDropdown, setAssetDropdown] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim() || !category) return;
-    onSubmit({ title: title.trim(), description: description.trim(), priority, category, submittedBy: userEmail, assetId, assetNome: assetNome || undefined }, files.length > 0 ? files : undefined);
-    setTitle(''); setDescription(''); setPriority('medium'); setCategory(''); setAssetId(undefined); setAssetNome(''); setAssetSearch(''); setFiles([]);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (!title.trim() || !description.trim() || !category || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onSubmit({ title: title.trim(), description: description.trim(), priority, category, submittedBy: userEmail, assetId, assetNome: assetNome || undefined }, files.length > 0 ? files : undefined);
+      setTitle(''); setDescription(''); setPriority('medium'); setCategory(''); setAssetId(undefined); setAssetNome(''); setAssetSearch(''); setFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -415,9 +421,15 @@ export function TicketForm({ onSubmit, userEmail, assets = [] }: TicketFormProps
               <p>Quanto mais detalhes você fornecer, mais rápido nossa equipe poderá resolver seu chamado.</p>
             </div>
 
-            <button type="submit" className="tf-submit">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              Enviar Chamado
+            <button type="submit" className="tf-submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <><span className="tf-spinner" /> Enviando...
+                </>
+              ) : (
+                <><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                Enviar Chamado
+                </>
+              )}
             </button>
           </form>
         </div>

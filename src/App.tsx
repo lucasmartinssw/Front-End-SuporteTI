@@ -7,7 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 import { TicketForm, Ticket } from './components/TicketForm';
 import { TicketList } from './components/TicketList';
 import { TicketDetail } from './components/TicketDetail';
-import { toast } from 'sonner';
+import { toast, Toaster } from 'sonner';
 import { Login } from './components/Login';
 
 
@@ -256,19 +256,40 @@ export default function App() {
     }
   };
 
+  const handleRefreshComments = useCallback(async (ticketId: string) => {
+    try {
+      const msgs = await chamadosApi.listMensagens(Number(ticketId));
+      const mapped = msgs.map((m: any) => ({
+        id: String(m.id),
+        author: m.author_email || m.author_name,
+        content: m.mensagem,
+        timestamp: new Date(m.enviado_em),
+        isInternal: m.is_internal,
+        attachments: m.attachments || [],
+      }));
+      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, comments: mapped } : t));
+      setSelectedTicket(prev => prev?.id === ticketId ? { ...prev, comments: mapped } : prev);
+    } catch {
+      // Silent — polling failure should not interrupt the user
+    }
+  }, []);
+
   if (!isAuthenticated) {
-    return <Login onLogin={(email, role, name, token) => {
-      localStorage.setItem('auth_token', token);
-      localStorage.setItem('auth_role', role);
-      localStorage.setItem('auth_email', email);
-      localStorage.setItem('auth_name', name);
-      setUserEmail(email);
-      setUserRole(role as any);
-      setUserName(name);
-      setAuthToken(token);
-      setToken(token);
-      setIsAuthenticated(true);
-    }} />;
+    return <>
+      <Login onLogin={(email, role, name, token) => {
+        localStorage.setItem('auth_token', token);
+        localStorage.setItem('auth_role', role);
+        localStorage.setItem('auth_email', email);
+        localStorage.setItem('auth_name', name);
+        setUserEmail(email);
+        setUserRole(role as any);
+        setUserName(name);
+        setAuthToken(token);
+        setToken(token);
+        setIsAuthenticated(true);
+      }} />
+      <Toaster position="top-right" richColors closeButton />
+    </>;
   }
 
   const handleSubmitTicket = async (ticketData: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'>, files?: File[]) => {
@@ -353,24 +374,6 @@ export default function App() {
       toast.error(err.message || 'Erro ao enviar comentário.');
     }
   };
-
-  const handleRefreshComments = useCallback(async (ticketId: string) => {
-    try {
-      const msgs = await chamadosApi.listMensagens(Number(ticketId));
-      const mapped = msgs.map((m: any) => ({
-        id: String(m.id),
-        author: m.author_email || m.author_name,
-        content: m.mensagem,
-        timestamp: new Date(m.enviado_em),
-        isInternal: m.is_internal,
-        attachments: m.attachments || [],
-      }));
-      setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, comments: mapped } : t));
-      setSelectedTicket(prev => prev?.id === ticketId ? { ...prev, comments: mapped } : prev);
-    } catch {
-      // Silent — polling failure should not interrupt the user
-    }
-  }, []);
 
   const handleTicketSelect = async (ticket: Ticket) => {
     setSelectedTicket(ticket);
@@ -836,7 +839,7 @@ export default function App() {
                 {userRole === 'client' ? 'Usuário' : 'Analista TI'}
               </span>
               <span className="welcome-badge">Bem-vindo, <strong>{userName}</strong></span>
-              <button className="btn-ghost" onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_role'); localStorage.removeItem('auth_email'); localStorage.removeItem('auth_name'); setIsAuthenticated(false); setAuthToken(null); setToken(null); setTickets([]); setAssets([]); setNotificacoes([]); setShowNotifs(false); }}>Sair</button>
+              <button className="btn-ghost" onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_role'); localStorage.removeItem('auth_email'); localStorage.removeItem('auth_name'); setIsAuthenticated(false); setAuthToken(null); setToken(null); setTickets([]); setAssets([]); setNotificacoes([]); setShowNotifs(false); setActiveView('dashboard'); }}>Sair</button>
             </div>
           </div>
         </header>
@@ -892,6 +895,7 @@ export default function App() {
           )}
         </main>
       </div>
+      <Toaster position="top-right" richColors closeButton />
     </>
   );
 }

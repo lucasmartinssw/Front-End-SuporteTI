@@ -6,7 +6,7 @@ interface TicketDetailProps {
   userRole: 'client' | 'it-executive';
   userEmail: string;
   onBack: () => void;
-  onAddComment: (ticketId: string, comment: string, isInternal: boolean, files?: File[]) => void;
+  onAddComment: (ticketId: string, comment: string, isInternal: boolean, files?: File[]) => void | Promise<void>;
   onRefreshComments: (ticketId: string) => void;
   onStatusUpdate: (ticketId: string, status: Ticket['status']) => void;
   technicians: { id: number; nome: string; email: string }[];
@@ -234,6 +234,8 @@ const styles = `
 
   .td-btn-send:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(99,102,241,0.35); }
   .td-btn-send:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+  .td-spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: td-spin 0.6s linear infinite; }
+  @keyframes td-spin { to { transform: rotate(360deg); } }
 
   /* Sidebar */
   .td-sidebar {}
@@ -411,6 +413,7 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
   const prevCommentCount = useRef(ticket.comments.length);
@@ -442,13 +445,18 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
 
   const visibleComments = ticket.comments.filter(c => userRole === 'it-executive' || !c.isInternal);
 
-  const handleSend = () => {
-    if (!newComment.trim() && attachedFiles.length === 0) return;
-    onAddComment(ticket.id, newComment.trim(), isInternal, attachedFiles.length > 0 ? attachedFiles : undefined);
-    setNewComment('');
-    setIsInternal(false);
-    setAttachedFiles([]);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  const handleSend = async () => {
+    if ((!newComment.trim() && attachedFiles.length === 0) || isSending) return;
+    setIsSending(true);
+    try {
+      await onAddComment(ticket.id, newComment.trim(), isInternal, attachedFiles.length > 0 ? attachedFiles : undefined);
+      setNewComment('');
+      setIsInternal(false);
+      setAttachedFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -613,9 +621,13 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                       </button>
                     </div>
-                    <button className="td-btn-send" onClick={handleSend} disabled={!newComment.trim() && attachedFiles.length === 0}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                      Comentar
+                    <button className="td-btn-send" onClick={handleSend} disabled={isSending || (!newComment.trim() && attachedFiles.length === 0)}>
+                      {isSending ? (
+                        <><span className="td-spinner" /> Enviando...</>
+                      ) : (
+                        <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        Comentar</>
+                      )}
                     </button>
                   </div>
                 </div>
