@@ -209,9 +209,9 @@ export default function App() {
         id: String(t.id),
         title: t.titulo,
         description: t.descricao,
-        priority: PRIORITY_MAP[t.prioridade_id] || 'medium',
+        priority: (PRIORITY_MAP[t.prioridade_id] || 'medium') as Ticket['priority'],
         category: t.categoria || 'Outros',
-        status: STATUS_MAP[t.status_id] || 'open',
+        status: (STATUS_MAP[t.status_id] || 'open') as Ticket['status'],
         submittedBy: t.user_email || '',
         tecnicos: (t.tecnicos || []) as {id: number; nome: string; email: string}[],
         assetId: t.ativo_id,
@@ -228,26 +228,17 @@ export default function App() {
         const rawAtivos = await ativosApi.list();
         setAssets(rawAtivos as any);
       } catch {
-        // Non-critical — just leave assets empty if it fails
+        // Não-crítico — mantém assets vazio se falhar
       }
 
       // Load technicians for assignment dropdown
-      try {
-        const techs = await users.list('tecnico');
-        const admins = await users.list('admin');
-        setTechnicians([...techs, ...admins]);
-      } catch {
-        // Non-critical
-      }
-
-      // Load technicians list (for assignment dropdown)
       try {
         const rawTechs = await usersApi.list('tecnico');
         const rawAdmins = await usersApi.list('admin');
         const allTechs = [...rawTechs, ...rawAdmins];
         setTechnicians(allTechs.map((u: any) => ({ id: u.id, nome: u.nome, email: u.email })));
       } catch {
-        // Non-critical
+        // Não-crítico
       }
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
