@@ -919,7 +919,7 @@ export default function App() {
                 {userRole === 'client' ? 'Usuário' : 'Analista TI'}
               </span>
               <span className="welcome-badge">Bem-vindo, <strong>{userName}</strong></span>
-              <button className="btn-ghost" onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_role'); localStorage.removeItem('auth_email'); localStorage.removeItem('auth_name'); setIsAuthenticated(false); setAuthToken(null); setToken(null); setTickets([]); setAssets([]); setNotificacoes([]); setShowNotifs(false); }}>Sair</button>
+              <button className="btn-ghost" onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_role'); localStorage.removeItem('auth_email'); localStorage.removeItem('auth_name'); setIsAuthenticated(false); setAuthToken(null); setToken(null); setTickets([]); setAssets([]); setNotificacoes([]); setShowNotifs(false); setActiveView('dashboard'); }}>Sair</button>
             </div>
           </div>
         </header>
