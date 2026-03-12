@@ -3,6 +3,7 @@ import { exportTicketPDF } from '../pdfExport';
 import { Ticket } from './TicketForm';
 import { ativos as ativosApi, chamados as chamadosApi } from '../api';
 import { Asset } from './AssetList';
+import { computeSLA, SLA_COLORS } from '../sla';
 
 interface TicketDetailProps {
   ticket: Ticket;
@@ -412,9 +413,23 @@ const styles = `
     object-fit: cover;
     flex-shrink: 0;
   }
+
+  /* SLA panel */
+  .sla-panel { border-radius: 12px; padding: 14px 16px; border: 1px solid transparent; margin-bottom: 16px; }
+  .sla-panel-title { font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .sla-bar-track { height: 6px; border-radius: 99px; background: rgba(0,0,0,0.08); overflow: hidden; margin-bottom: 8px; }
+  .sla-bar-fill { height: 100%; border-radius: 99px; transition: width 1s linear; }
+  .sla-label { font-size: 13px; font-weight: 600; }
+  .sla-limit { font-size: 11px; opacity: 0.7; margin-top: 2px; }
 `;
 
 export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack, onAddComment, onRefreshComments, onStatusUpdate, onAddTecnico, onRemoveTecnico, assets = [], onAssetLinked, onAssetUnlinked, onShowHistory }: TicketDetailProps) {
+  // Live clock for SLA countdown — ticks every minute
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
@@ -721,6 +736,31 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
 
           {/* Sidebar */}
           <div className="td-sidebar">
+            {/* SLA Panel */}
+            {(() => {
+              const sla = computeSLA(ticket.priority, ticket.status, ticket.createdAt, now);
+              if (!sla.isActive) return null;
+              const c = SLA_COLORS[sla.status];
+              const barWidth = Math.min(sla.percentUsed, 100);
+              return (
+                <div className="sla-panel" style={{ background: c.bg, borderColor: c.border, color: c.text }}>
+                  <p className="sla-panel-title" style={{ color: c.text }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      {sla.status === 'overdue'
+                        ? <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>
+                        : <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>}
+                    </svg>
+                    SLA
+                  </p>
+                  <div className="sla-bar-track">
+                    <div className="sla-bar-fill" style={{ width: `${barWidth}%`, background: c.bar }} />
+                  </div>
+                  <p className="sla-label" style={{ color: c.text }}>{sla.label}</p>
+                  <p className="sla-limit" style={{ color: c.text }}>Limite: {sla.limitH}h para prioridade {({ low:'Baixa', medium:'Média', high:'Alta', urgent:'Urgente' } as any)[ticket.priority]}</p>
+                </div>
+              );
+            })()}
+
             <div className="td-card" style={{marginBottom:'16px'}}>
               <div className="td-card-header">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
