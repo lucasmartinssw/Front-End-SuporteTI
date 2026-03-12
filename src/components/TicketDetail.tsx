@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { exportTicketPDF } from '../pdfExport';
 import { Ticket } from './TicketForm';
 import { ativos as ativosApi, chamados as chamadosApi } from '../api';
 import { Asset } from './AssetList';
@@ -534,15 +535,25 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
             Voltar aos chamados
           </button>
-          {onShowHistory && (
-            <button onClick={onShowHistory}
+          <div style={{display:'flex',gap:8}}>
+            {onShowHistory && (
+              <button onClick={onShowHistory}
+                style={{display:'inline-flex',alignItems:'center',gap:6,height:34,padding:'0 14px',background:'#f7f8fc',border:'1px solid #f0f1f5',borderRadius:9,fontSize:12.5,fontWeight:600,color:'#6b7280',cursor:'pointer',fontFamily:'DM Sans,sans-serif',transition:'all 0.18s'}}
+                onMouseEnter={e=>{e.currentTarget.style.background='#eef2ff';e.currentTarget.style.color='#6366f1';e.currentTarget.style.borderColor='#c7d2fe'}}
+                onMouseLeave={e=>{e.currentTarget.style.background='#f7f8fc';e.currentTarget.style.color='#6b7280';e.currentTarget.style.borderColor='#f0f1f5'}}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Histórico
+              </button>
+            )}
+            <button
+              onClick={() => exportTicketPDF(ticket, userRole)}
               style={{display:'inline-flex',alignItems:'center',gap:6,height:34,padding:'0 14px',background:'#f7f8fc',border:'1px solid #f0f1f5',borderRadius:9,fontSize:12.5,fontWeight:600,color:'#6b7280',cursor:'pointer',fontFamily:'DM Sans,sans-serif',transition:'all 0.18s'}}
-              onMouseEnter={e=>{e.currentTarget.style.background='#eef2ff';e.currentTarget.style.color='#6366f1';e.currentTarget.style.borderColor='#c7d2fe'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='#fff1f2';e.currentTarget.style.color='#dc2626';e.currentTarget.style.borderColor='#fecaca'}}
               onMouseLeave={e=>{e.currentTarget.style.background='#f7f8fc';e.currentTarget.style.color='#6b7280';e.currentTarget.style.borderColor='#f0f1f5'}}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              Histórico
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+              Exportar PDF
             </button>
-          )}
+          </div>
         </div>
 
         <div className="td-header">

@@ -41,16 +41,6 @@ async function request<T>(
     headers['Content-Type'] = 'application/json';
   }
 
-  // Debug logging
-  console.group(`🌐 API ${options.method || 'GET'} ${path}`);
-  console.log('Token present:', !!_token);
-  console.log('Token value:', _token ? _token.substring(0, 30) + '...' : 'NONE');
-  console.log('Headers:', headers);
-  if (options.body && !(options.body instanceof FormData)) {
-    console.log('Body:', options.body);
-  }
-  console.groupEnd();
-
   const response = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers,
@@ -64,8 +54,13 @@ async function request<T>(
       const err = JSON.parse(rawBody);
       detail = err.detail || detail;
     } catch {}
-    console.error(`❌ API Error ${response.status} on ${path}:`, rawBody);
-    throw new Error(detail);
+    // Session expired — broadcast event so App.tsx can handle logout
+    if (response.status === 401) {
+      window.dispatchEvent(new CustomEvent('session-expired'));
+    }
+    const err = new Error(detail) as any;
+    err.status = response.status;
+    throw err;
   }
 
   // 204 No Content — return empty object
@@ -354,6 +349,7 @@ export const STATUS_MAP: Record<number, string> = {
   1: 'open',
   2: 'in-progress',
   3: 'resolved',
+  4: 'closed',
 };
 
 export const STATUS_ID_MAP: Record<string, number> = {

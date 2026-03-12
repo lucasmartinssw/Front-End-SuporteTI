@@ -15,17 +15,19 @@ export interface Asset {
   created_at: string;
   updated_at: string;
   chamados?: any[];
-  chamados_count?: number;
 }
 
 interface AssetListProps {
   assets: Asset[];
+  isLoading?: boolean;
   onSelectAsset: (asset: Asset) => void;
   onNewAsset: () => void;
 }
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=DM+Sans:wght@400;500&display=swap');
+  @keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
+  .sk-cell { border-radius:6px; display:inline-block; background:linear-gradient(90deg,#f0f1f5 25%,#e8eaf0 50%,#f0f1f5 75%); background-size:400px 100%; animation:shimmer 1.4s infinite; }
 
   @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -107,6 +109,28 @@ const styles = `
   .al-empty-sub { font-size: 13px; color: #9ca3af; }
 
   .al-ticket-count { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #6b7280; background: #f3f4f6; padding: 2px 8px; border-radius: 20px; }
+  .al-export-btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; background: #fff; border: 1px solid #f0f1f5; border-radius: 9px; font-size: 12.5px; font-weight: 600; color: #6b7280; cursor: pointer; font-family: 'DM Sans',sans-serif; transition: all 0.18s; white-space: nowrap; }
+  .al-export-btn:hover { background: #f7f8fc; color: #111827; }
+  .al-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+  .al-result-count { font-size: 12.5px; color: #9ca3af; }
+  .al-pagination { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-top: 1px solid #f7f8fc; flex-wrap: wrap; gap: 10px; }
+  .al-pagination-info { font-size: 12.5px; color: #9ca3af; }
+  .al-pagination-btns { display: flex; align-items: center; gap: 4px; }
+  .al-page-btn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid #f0f1f5; background: #fff; font-size: 13px; font-weight: 500; color: #6b7280; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; font-family: 'DM Sans',sans-serif; }
+  .al-page-btn:hover:not(:disabled) { background: #f7f8fc; color: #111827; }
+  .al-page-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; font-weight: 700; }
+  .al-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  @media (max-width: 768px) {
+    .al-header { flex-direction: column; gap: 12px; }
+    .al-filters { flex-direction: column; }
+    .al-table th:nth-child(2), .al-table td:nth-child(2),
+    .al-table th:nth-child(5), .al-table td:nth-child(5) { display: none; }
+    .al-toolbar { flex-direction: column; align-items: flex-start; }
+    .al-pagination { flex-direction: column; align-items: flex-start; }
+  }
+  @media (max-width: 480px) {
+    .al-table th:nth-child(3), .al-table td:nth-child(3) { display: none; }
+  }
 
   @media (max-width: 900px) {
     .al-stats { grid-template-columns: repeat(2, 1fr); }
@@ -139,10 +163,13 @@ const MOCK_ASSETS: Asset[] = [
   { id: 5, nome: 'Servidor Dell PowerEdge', tipo: 'servidor', numero_serie: 'SN-2021-001', patrimonio: 'PAT-004', localizacao: 'Sala Servidores', status: 'ativo', responsavel_nome: 'Carlos Tech', created_at: '2021-01-20T08:00:00', updated_at: '2024-01-01T08:00:00', chamados: [{}, {}, {}] },
 ];
 
-export function AssetList({ assets, onSelectAsset, onNewAsset }: AssetListProps) {
+export function AssetList({ assets, isLoading = false, onSelectAsset, onNewAsset }: AssetListProps) {
   const [search, setSearch] = useState('');
   const [filterTipo, setFilterTipo] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 12;
 
   const filtered = assets.filter(a => {
     const matchSearch = !search || a.nome.toLowerCase().includes(search.toLowerCase()) ||
@@ -163,6 +190,30 @@ export function AssetList({ assets, onSelectAsset, onNewAsset }: AssetListProps)
 
   const statusClass = (s: string) => ({ ativo: 's-ativo', manutencao: 's-manutencao', reserva: 's-reserva', desativado: 's-desativado' }[s] || '');
   const statusLabel = (s: string) => ({ ativo: 'Ativo', manutencao: 'Manutenção', reserva: 'Reserva', desativado: 'Desativado' }[s] || s);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const exportCSV = () => {
+    const STATUS_LABEL: Record<string,string> = { ativo:'Ativo', manutencao:'Manutenção', reserva:'Reserva', desativado:'Desativado' };
+    const header = ['ID','Nome','Tipo','Nº Série','Patrimônio','Localização','Status','Responsável'];
+    const rows = filtered.map(a => [
+      a.id,
+      `"${(a.nome||'').replace(/"/g,'""')}"`,
+      a.tipo || '',
+      a.numero_serie || '',
+      a.patrimonio || '',
+      `"${(a.localizacao||'').replace(/"/g,'""')}"`,
+      STATUS_LABEL[a.status] || a.status,
+      `"${(a.responsavel_nome||'').replace(/"/g,'""')}"`,
+    ]);
+    const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a2 = document.createElement('a'); a2.href = url; a2.download = 'ativos.csv'; a2.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <>
@@ -215,15 +266,40 @@ export function AssetList({ assets, onSelectAsset, onNewAsset }: AssetListProps)
           </select>
         </div>
 
+        {/* Toolbar */}
+        <div className="al-toolbar">
+          <span className="al-result-count">{filtered.length} ativo{filtered.length !== 1 ? 's' : ''}</span>
+          <button className="al-export-btn" onClick={exportCSV}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar CSV
+          </button>
+        </div>
+
         {/* Table */}
         <div className="al-table-wrap">
-          {filtered.length === 0 ? (
+          {isLoading ? (
+            <table className="al-table">
+              <thead><tr><th>Equipamento</th><th>Tipo</th><th>Localização</th><th>Status</th><th>Responsável</th><th>Chamados</th></tr></thead>
+              <tbody>
+                {[1,2,3,4,5].map(i => (
+                  <tr key={i}>
+                    <td><div className="sk-cell" style={{height:13,width:'80%',marginBottom:5}} /><div className="sk-cell" style={{height:10,width:'50%'}} /></td>
+                    <td><div className="sk-cell" style={{height:13,width:60}} /></td>
+                    <td><div className="sk-cell" style={{height:13,width:80}} /></td>
+                    <td><div className="sk-cell" style={{height:22,width:70,borderRadius:20}} /></td>
+                    <td><div className="sk-cell" style={{height:13,width:90}} /></td>
+                    <td><div className="sk-cell" style={{height:22,width:28,borderRadius:20}} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : filtered.length === 0 ? (
             <div className="al-empty">
               <div className="al-empty-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
               </div>
-              <p className="al-empty-title">Nenhum ativo encontrado</p>
-              <p className="al-empty-sub">Tente ajustar os filtros ou cadastre um novo ativo.</p>
+              <p className="al-empty-title">{assets.length === 0 ? 'Nenhum ativo cadastrado' : 'Nenhum ativo encontrado'}</p>
+              <p className="al-empty-sub">{assets.length === 0 ? 'Clique em "Novo Ativo" para cadastrar seu primeiro equipamento.' : 'Tente ajustar os filtros de busca.'}</p>
             </div>
           ) : (
             <table className="al-table">
@@ -238,7 +314,7 @@ export function AssetList({ assets, onSelectAsset, onNewAsset }: AssetListProps)
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(asset => (
+                {paged.map(asset => (
                   <tr key={asset.id} onClick={() => onSelectAsset(asset)}>
                     <td>
                       <div style={{ fontWeight: 500, color: '#111827', marginBottom: 2 }}>{asset.nome}</div>
@@ -246,18 +322,16 @@ export function AssetList({ assets, onSelectAsset, onNewAsset }: AssetListProps)
                       {asset.numero_serie && <div style={{ fontSize: 11.5, color: '#9ca3af' }}>Série: {asset.numero_serie}</div>}
                     </td>
                     <td>
-                      <span className="al-tipo-badge">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={TIPO_ICONS[asset.tipo]}/></svg>
-                        {TIPO_LABELS[asset.tipo]}
-                      </span>
+                      <span className="al-tipo-badge">{TIPO_LABELS[asset.tipo] || asset.tipo}</span>
                     </td>
-                    <td style={{ color: asset.localizacao ? '#374151' : '#c4c9d4' }}>{asset.localizacao || '—'}</td>
+                    <td>{asset.localizacao || '—'}</td>
                     <td>
                       <span className={`al-status-badge ${statusClass(asset.status)}`}>
-                        <span className="dot"/>{statusLabel(asset.status)}
+                        <span className="dot" />
+                        {statusLabel(asset.status)}
                       </span>
                     </td>
-                    <td style={{ color: asset.responsavel_nome ? '#374151' : '#c4c9d4' }}>{asset.responsavel_nome || '—'}</td>
+                    <td>{asset.responsavel_nome || '—'}</td>
                     <td>
                       <span className="al-ticket-count">
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -268,6 +342,35 @@ export function AssetList({ assets, onSelectAsset, onNewAsset }: AssetListProps)
                 ))}
               </tbody>
             </table>
+          )}
+
+          {!isLoading && totalPages > 1 && (
+            <div className="al-pagination">
+              <span className="al-pagination-info">
+                Mostrando {Math.min((safePage - 1) * PAGE_SIZE + 1, filtered.length)}–{Math.min(safePage * PAGE_SIZE, filtered.length)} de {filtered.length}
+              </span>
+              <div className="al-pagination-btns">
+                <button className="al-page-btn" disabled={safePage === 1} onClick={() => setCurrentPage(p => p - 1)}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                {Array.from({length: totalPages}, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                  .reduce<(number|string)[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && (p as number) - (arr[idx-1] as number) > 1) acc.push('…');
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, i) => (
+                    typeof p === 'string'
+                      ? <span key={`e${i}`} style={{padding:'0 4px',color:'#9ca3af',fontSize:13}}>…</span>
+                      : <button key={p} className={`al-page-btn${safePage === p ? ' active' : ''}`} onClick={() => setCurrentPage(p as number)}>{p}</button>
+                  ))
+                }
+                <button className="al-page-btn" disabled={safePage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>

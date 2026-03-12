@@ -5,6 +5,7 @@ interface TicketListProps {
   tickets: Ticket[];
   userRole: 'client' | 'it-executive';
   userEmail: string;
+  isLoading?: boolean;
   technicians: { id: number; nome: string; email: string }[];
   onTicketSelect: (ticket: Ticket) => void;
   onStatusUpdate: (ticketId: string, status: Ticket['status']) => void;
@@ -133,6 +134,39 @@ const styles = `
   }
 
   .tl-empty-sub { font-size: 13.5px; color: #9ca3af; }
+  .tl-empty-action { margin-top: 16px; display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg,#6366f1,#4f46e5); color: #fff; border: none; border-radius: 9px; padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'DM Sans',sans-serif; }
+
+  /* Export button */
+  .tl-export-btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; background: #fff; border: 1px solid #f0f1f5; border-radius: 9px; font-size: 12.5px; font-weight: 600; color: #6b7280; cursor: pointer; font-family: 'DM Sans',sans-serif; transition: all 0.18s; white-space: nowrap; }
+  .tl-export-btn:hover { background: #f7f8fc; color: #111827; }
+  .tl-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+  .tl-toolbar-left { display: flex; align-items: center; gap: 8px; }
+
+  /* Pagination */
+  .tl-pagination { display: flex; align-items: center; justify-content: space-between; padding: 16px 0 0; flex-wrap: wrap; gap: 10px; }
+  .tl-pagination-info { font-size: 12.5px; color: #9ca3af; }
+  .tl-pagination-btns { display: flex; align-items: center; gap: 4px; }
+  .tl-page-btn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid #f0f1f5; background: #fff; font-size: 13px; font-weight: 500; color: #6b7280; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; font-family: 'DM Sans',sans-serif; }
+  .tl-page-btn:hover:not(:disabled) { background: #f7f8fc; color: #111827; }
+  .tl-page-btn.active { background: #6366f1; color: #fff; border-color: #6366f1; font-weight: 700; }
+  .tl-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* Mobile */
+  @media (max-width: 640px) {
+    .tl-page { padding: 16px; }
+    .tl-page-title { font-size: 20px; }
+    .tl-filters { flex-direction: column; gap: 8px; }
+    .tl-search-wrap { width: 100%; }
+    .tl-select { width: 100%; }
+    .tl-item { flex-direction: column; gap: 10px; }
+    .tl-item-top { flex-wrap: wrap; gap: 6px; }
+    .tl-actions { flex-direction: row; flex-wrap: wrap; }
+    .tl-toolbar { flex-direction: column; align-items: flex-start; }
+    .tl-pagination { flex-direction: column; align-items: flex-start; }
+  }
+  @keyframes shimmer { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
+  .sk-row { background:#fff; border:1px solid #f0f1f5; border-radius:12px; padding:18px 20px; margin-bottom:10px; }
+  .sk-line { border-radius:6px; background:linear-gradient(90deg,#f0f1f5 25%,#e8eaf0 50%,#f0f1f5 75%); background-size:400px 100%; animation:shimmer 1.4s infinite; }
 
   /* Ticket rows */
   .tl-list { display: flex; flex-direction: column; gap: 10px; }
@@ -280,10 +314,13 @@ const styles = `
   .tl-action-select:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.08); }
 `;
 
-export function TicketList({ tickets, userRole, userEmail, technicians, onTicketSelect, onStatusUpdate, onAddTecnico, onRemoveTecnico }: TicketListProps) {
+export function TicketList({ tickets, userRole, userEmail, isLoading = false, technicians, onTicketSelect, onStatusUpdate, onAddTecnico, onRemoveTecnico }: TicketListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 15;
 
   const filteredTickets = tickets.filter(ticket => {
     if (userRole === 'client' && ticket.submittedBy !== userEmail) return false;
@@ -292,6 +329,29 @@ export function TicketList({ tickets, userRole, userEmail, technicians, onTicket
     if (priorityFilter !== 'all' && ticket.priority !== priorityFilter) return false;
     return true;
   });
+
+  // Reset to page 1 when filters change
+  const totalPages = Math.max(1, Math.ceil(filteredTickets.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedTickets = filteredTickets.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const exportCSV = () => {
+    const header = ['ID', 'Título', 'Status', 'Prioridade', 'Categoria', 'Criado por', 'Data'];
+    const rows = filteredTickets.map(t => [
+      t.id,
+      `"${t.title.replace(/"/g, '""')}"`,
+      t.status,
+      t.priority,
+      t.category,
+      t.submittedBy,
+      new Intl.DateTimeFormat('pt-BR').format(t.createdAt),
+    ]);
+    const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'chamados.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const formatDate = (date: Date) => new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
 
@@ -326,20 +386,55 @@ export function TicketList({ tickets, userRole, userEmail, technicians, onTicket
             <option value="medium">Médio</option>
             <option value="low">Baixo</option>
           </select>
-          <span className="tl-count">{filteredTickets.length} chamado{filteredTickets.length !== 1 ? 's' : ''}</span>
         </div>
 
-        {filteredTickets.length === 0 ? (
+        <div className="tl-toolbar">
+          <div className="tl-toolbar-left">
+            <span className="tl-count">{filteredTickets.length} chamado{filteredTickets.length !== 1 ? 's' : ''}</span>
+          </div>
+          <button className="tl-export-btn" onClick={exportCSV} title="Exportar lista para CSV">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar CSV
+          </button>
+        </div>
+
+
+        {isLoading ? (
+          <div>
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="sk-row">
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:10}}>
+                  <div className="sk-line" style={{height:14,width:'45%'}} />
+                  <div className="sk-line" style={{height:14,width:'12%'}} />
+                </div>
+                <div className="sk-line" style={{height:11,width:'70%',marginBottom:8}} />
+                <div style={{display:'flex',gap:8}}>
+                  <div className="sk-line" style={{height:11,width:'10%'}} />
+                  <div className="sk-line" style={{height:11,width:'8%'}} />
+                  <div className="sk-line" style={{height:11,width:'15%'}} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filteredTickets.length === 0 ? (
           <div className="tl-empty">
             <div className="tl-empty-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             </div>
-            <p className="tl-empty-title">Nenhum chamado encontrado</p>
-            <p className="tl-empty-sub">{userRole === 'client' ? 'Você ainda não enviou nenhum chamado.' : 'Nenhum chamado corresponde aos filtros aplicados.'}</p>
+            <p className="tl-empty-title">
+              {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all'
+                ? 'Nenhum resultado encontrado'
+                : userRole === 'client' ? 'Você ainda não tem chamados' : 'Nenhum chamado no sistema'}
+            </p>
+            <p className="tl-empty-sub">
+              {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all'
+                ? 'Tente ajustar os filtros ou limpar a pesquisa.'
+                : userRole === 'client' ? 'Clique em "Enviar Chamado" para abrir seu primeiro chamado.' : 'Os chamados aparecerão aqui assim que forem criados.'}
+            </p>
           </div>
         ) : (
           <div className="tl-list">
-            {filteredTickets.map(ticket => (
+            {pagedTickets.map(ticket => (
               <div key={ticket.id} className={`tl-item status-${ticket.status}`} onClick={() => onTicketSelect(ticket)}>
                 <div className="tl-item-body">
                   <div className="tl-item-top">
@@ -398,9 +493,38 @@ export function TicketList({ tickets, userRole, userEmail, technicians, onTicket
                       ))}
                     </select>
                   </div>
-                               )}
+                )}
               </div>
             ))}
+          </div>
+        )}
+
+        {!isLoading && totalPages > 1 && (
+          <div className="tl-pagination">
+            <span className="tl-pagination-info">
+              Mostrando {Math.min((safePage - 1) * PAGE_SIZE + 1, filteredTickets.length)}–{Math.min(safePage * PAGE_SIZE, filteredTickets.length)} de {filteredTickets.length}
+            </span>
+            <div className="tl-pagination-btns">
+              <button className="tl-page-btn" disabled={safePage === 1} onClick={() => setCurrentPage(p => p - 1)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              {Array.from({length: totalPages}, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                .reduce<(number|string)[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && (p as number) - (arr[idx-1] as number) > 1) acc.push('…');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, i) => (
+                  typeof p === 'string'
+                    ? <span key={`e${i}`} style={{padding:'0 4px',color:'#9ca3af',fontSize:13}}>…</span>
+                    : <button key={p} className={`tl-page-btn${safePage === p ? ' active' : ''}`} onClick={() => setCurrentPage(p as number)}>{p}</button>
+                ))
+              }
+              <button className="tl-page-btn" disabled={safePage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
           </div>
         )}
       </div>

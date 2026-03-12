@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import iconImg from './assets/Icon test blue simple.png';
+import { exportDashboardPDF } from './pdfExport';
 import { chamados as chamadosApi, ativos as ativosApi, users as usersApi, notificacoes as notificacoesApi, setToken, STATUS_MAP, PRIORITY_MAP, STATUS_ID_MAP, PRIORITY_ID_MAP, Notificacao } from './api';
 import { AssetList, Asset } from './components/AssetList';
 import { AssetForm } from './components/AssetForm';
@@ -158,12 +159,32 @@ const appStyles = `
     .stat-grid, .stat-grid-3 { grid-template-columns: repeat(2, 1fr); }
     .app-header-inner, .app-main { padding-left: 20px; padding-right: 20px; }
   }
+  @media (max-width: 640px) {
+    .app-header-inner { padding: 0 16px; height: 56px; }
+    .app-main { padding: 16px; }
+    .logo-text { display: none; }
+    .app-nav { gap: 0; }
+    .nav-btn { padding: 6px 10px; font-size: 12.5px; }
+    .header-right { gap: 6px; }
+    .user-pill { display: none; }
+    .stat-grid, .stat-grid-3 { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .chart-grid { grid-template-columns: 1fr; }
+    .recent-grid { grid-template-columns: 1fr; }
+    .user-pill-name { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  }
+  @media (max-width: 400px) {
+    .nav-btn { padding: 6px 8px; font-size: 12px; }
+    .stat-grid, .stat-grid-3 { grid-template-columns: 1fr 1fr; }
+  }
 `;
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('auth_token'));
   const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isLoadingTickets, setIsLoadingTickets] = useState(false);
+  const [isLoadingAssets, setIsLoadingAssets] = useState(false);
   const [userRole, setUserRole] = useState<'client' | 'it-executive'>(() => (localStorage.getItem('auth_role') as any) || 'client');
   const [userEmail, setUserEmail] = useState(() => localStorage.getItem('auth_email') || '');
   const [userName, setUserName] = useState(() => localStorage.getItem('auth_name') || '');
@@ -188,6 +209,15 @@ export default function App() {
     loadData();
   }, [isAuthenticated, authToken]);
 
+  // Listen for 401s dispatched by api.ts
+  useEffect(() => {
+    const onExpired = () => {
+      handleSessionExpired();
+    };
+    window.addEventListener('session-expired', onExpired);
+    return () => window.removeEventListener('session-expired', onExpired);
+  }, []);
+
   // Poll notifications every 30 seconds
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -202,8 +232,24 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
+  const handleSessionExpired = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_role');
+    localStorage.removeItem('auth_email');
+    localStorage.removeItem('auth_name');
+    setIsAuthenticated(false);
+    setAuthToken(null);
+    setToken(null);
+    setTickets([]);
+    setAssets([]);
+    setNotificacoes([]);
+    setSessionExpired(true);
+  };
+
   const loadData = async () => {
     setIsLoadingData(true);
+    setIsLoadingTickets(true);
+    setIsLoadingAssets(true);
     try {
       // Load tickets
       const rawTickets = await chamadosApi.list();
@@ -220,10 +266,11 @@ export default function App() {
         assetNome: t.ativo_nome,
         attachments: t.attachments || [],
         createdAt: new Date(t.created_at),
-        updatedAt: new Date(t.updated_at),
+        updatedAt: new Date(t.updated_at ?? t.created_at),
         comments: [],
       }));
       setTickets(mapped);
+      setIsLoadingTickets(false);
 
       // Load assets for all users (needed for ticket form dropdown)
       try {
@@ -232,6 +279,7 @@ export default function App() {
       } catch {
         // Non-critical — just leave assets empty if it fails
       }
+      setIsLoadingAssets(false);
 
       // Load technicians list (for assignment dropdown)
       try {
@@ -242,15 +290,21 @@ export default function App() {
       } catch {
         // Non-critical
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao carregar dados:', err);
+      if (err?.status === 401 || err?.message?.includes('401') || err?.message?.toLowerCase().includes('unauthorized') || err?.message?.toLowerCase().includes('token')) {
+        handleSessionExpired();
+      }
     } finally {
       setIsLoadingData(false);
+      setIsLoadingTickets(false);
+      setIsLoadingAssets(false);
     }
   };
 
   if (!isAuthenticated) {
-    return <Login onLogin={(email, role, name, token) => {
+    return <Login sessionExpired={sessionExpired} onLogin={(email, role, name, token) => {
+      setSessionExpired(false);
       localStorage.setItem('auth_token', token);
       localStorage.setItem('auth_role', role);
       localStorage.setItem('auth_email', email);
@@ -573,13 +627,45 @@ export default function App() {
   );
 
   // ── TECH dashboard render ────────────────────────────
-  const renderTechDashboard = () => (
+  const renderTechDashboard = () => {
+    // Build category data for PDF
+    const catMap: Record<string, number> = {};
+    tickets.forEach(t => { catMap[t.category] = (catMap[t.category] || 0) + 1; });
+    const topCategories = Object.entries(catMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name, count]) => ({ name, count }));
+
+    const dashboardPDFStats = {
+      total: allStats.total,
+      open: allStats.open,
+      inProgress: allStats.inProgress,
+      resolved: allStats.resolved,
+      closed: tickets.filter(t => t.status === 'closed').length,
+      assets: {
+        total: assets.length,
+        ativo: assets.filter(a => a.status === 'ativo').length,
+        manutencao: assets.filter(a => a.status === 'manutencao').length,
+        desativado: assets.filter(a => a.status === 'desativado').length,
+      },
+      weekData: WEEKLY_DATA,
+      topCategories,
+      generatedBy: userName || userEmail,
+    };
+
+    return (
     <div>
       <div className="dash-header">
         <div>
           <h1 className="dash-title">Dashboard</h1>
           <p className="dash-sub">Visão geral do sistema — todos os chamados</p>
         </div>
+        <button
+          onClick={() => exportDashboardPDF(dashboardPDFStats)}
+          style={{display:'inline-flex',alignItems:'center',gap:7,height:38,padding:'0 18px',background:'linear-gradient(135deg,#6366f1,#4f46e5)',color:'#fff',border:'none',borderRadius:10,fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:"'DM Sans',sans-serif",boxShadow:'0 2px 8px rgba(99,102,241,0.25)',flexShrink:0}}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          Exportar Relatório PDF
+        </button>
       </div>
 
       {/* System-wide stat cards */}
@@ -735,7 +821,8 @@ export default function App() {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <>
@@ -834,7 +921,7 @@ export default function App() {
         <main className="app-main">
           {activeView === 'dashboard' && (userRole === 'client' ? renderClientDashboard() : renderTechDashboard())}
           {activeView === 'tickets' && (
-            <TicketList tickets={tickets} userRole={userRole} userEmail={userEmail} technicians={technicians} onTicketSelect={handleTicketSelect} onStatusUpdate={handleStatusUpdate} onAddTecnico={handleAddTecnico} onRemoveTecnico={handleRemoveTecnico} />
+            <TicketList tickets={tickets} userRole={userRole} userEmail={userEmail} isLoading={isLoadingTickets} technicians={technicians} onTicketSelect={handleTicketSelect} onStatusUpdate={handleStatusUpdate} onAddTecnico={handleAddTecnico} onRemoveTecnico={handleRemoveTecnico} />
           )}
           {activeView === 'submit' && userRole === 'client' && (
             <TicketForm onSubmit={handleSubmitTicket} userEmail={userEmail} assets={assets.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, localizacao: a.localizacao }))} />
@@ -869,6 +956,7 @@ export default function App() {
           {activeView === 'assets' && userRole === 'it-executive' && (
             <AssetList
               assets={assets}
+              isLoading={isLoadingAssets}
               onSelectAsset={(asset) => { setSelectedAsset(asset); setActiveView('asset-detail'); }}
               onNewAsset={() => setActiveView('asset-form')}
             />

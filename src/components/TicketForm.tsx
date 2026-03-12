@@ -90,6 +90,9 @@ const styles = `
   }
 
   .tf-input::placeholder, .tf-textarea::placeholder { color: #c4c9d4; }
+  .tf-input.error, .tf-select.error, .tf-textarea.error { border-color: #fca5a5; background: #fff5f5; }
+  .tf-input.error:focus, .tf-select.error:focus, .tf-textarea.error:focus { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.08); }
+  .tf-error-msg { font-size: 11.5px; color: #ef4444; margin-top: 5px; display: flex; align-items: center; gap: 4px; }
 
   .tf-input:focus, .tf-select:focus, .tf-textarea:focus {
     border-color: #6366f1;
@@ -274,12 +277,20 @@ export function TicketForm({ onSubmit, userEmail, assets = [] }: TicketFormProps
   const [assetDropdown, setAssetDropdown] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [errors, setErrors] = useState<Record<string,string>>({});
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim() || !category) return;
+    const errs: Record<string,string> = {};
+    if (!title.trim()) errs.title = 'Breve descrição é obrigatória.';
+    else if (title.trim().length < 5) errs.title = 'Mínimo de 5 caracteres.';
+    if (!category) errs.category = 'Selecione uma categoria.';
+    if (!description.trim()) errs.description = 'Descrição detalhada é obrigatória.';
+    else if (description.trim().length < 10) errs.description = 'Mínimo de 10 caracteres.';
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
     onSubmit({ title: title.trim(), description: description.trim(), priority, category, submittedBy: userEmail, assetId, assetNome: assetNome || undefined }, files.length > 0 ? files : undefined);
-    setTitle(''); setDescription(''); setPriority('medium'); setCategory(''); setAssetId(undefined); setAssetNome(''); setAssetSearch(''); setFiles([]);
+    setTitle(''); setDescription(''); setPriority('medium'); setCategory(''); setAssetId(undefined); setAssetNome(''); setAssetSearch(''); setFiles([]); setErrors({});
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -314,16 +325,18 @@ export function TicketForm({ onSubmit, userEmail, assets = [] }: TicketFormProps
           <form onSubmit={handleSubmit}>
             <div className="tf-field">
               <label className="tf-label">Breve Descrição <span>*</span></label>
-              <input className="tf-input" type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Descreva brevemente o problema ou solicitação" required />
+              <input className={`tf-input${errors.title ? ' error' : ''}`} type="text" value={title} onChange={e => { setTitle(e.target.value); if(errors.title) setErrors(p=>({...p,title:''})); }} placeholder="Descreva brevemente o problema ou solicitação" />
+              {errors.title && <p className="tf-error-msg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>{errors.title}</p>}
             </div>
 
             <div className="tf-row tf-field">
               <div>
                 <label className="tf-label">Categoria <span>*</span></label>
-                <select className="tf-select" value={category} onChange={e => setCategory(e.target.value)} required>
+                <select className={`tf-select${errors.category ? ' error' : ''}`} value={category} onChange={e => { setCategory(e.target.value); if(errors.category) setErrors(p=>({...p,category:''})); }}>
                   <option value="">Selecione a categoria</option>
                   {categories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
+                {errors.category && <p className="tf-error-msg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>{errors.category}</p>}
               </div>
               <div>
                 <label className="tf-label">Prioridade <span>*</span></label>
@@ -340,7 +353,8 @@ export function TicketForm({ onSubmit, userEmail, assets = [] }: TicketFormProps
 
             <div className="tf-field">
               <label className="tf-label">Descrição detalhada <span>*</span></label>
-              <textarea className="tf-textarea" value={description} onChange={e => setDescription(e.target.value)} placeholder="Descreva detalhadamente o que está ocorrendo, incluindo mensagens de erro, quando começou e qualquer informação relevante..." required />
+              <textarea className={`tf-textarea${errors.description ? ' error' : ''}`} value={description} onChange={e => { setDescription(e.target.value); if(errors.description) setErrors(p=>({...p,description:''})); }} placeholder="Descreva detalhadamente o que está ocorrendo, incluindo mensagens de erro, quando começou e qualquer informação relevante..." />
+              {errors.description && <p className="tf-error-msg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>{errors.description}</p>}
             </div>
 
             {/* Asset selector */}

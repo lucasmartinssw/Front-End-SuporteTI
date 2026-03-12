@@ -3,11 +3,12 @@ import { auth, setToken } from "../api";
 
 interface LoginProps {
   onLogin: (email: string, role: string, name: string, token: string) => void;
+  sessionExpired?: boolean;
 }
 
 type UserRole = "usuario" | "tecnico";
 
-export function Login({ onLogin }: LoginProps) {
+export function Login({ onLogin, sessionExpired = false }: LoginProps) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,9 +16,18 @@ export function Login({ onLogin }: LoginProps) {
   const [role, setRole] = useState<UserRole>("usuario");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string,string>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const ferrs: Record<string,string> = {};
+    if (isRegistering && !name.trim()) ferrs.name = 'Nome é obrigatório.';
+    if (!email.trim()) ferrs.email = 'E-mail é obrigatório.';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) ferrs.email = 'E-mail inválido.';
+    if (!password) ferrs.password = 'Senha é obrigatória.';
+    else if (isRegistering && password.length < 6) ferrs.password = 'Mínimo de 6 caracteres.';
+    setFieldErrors(ferrs);
+    if (Object.keys(ferrs).length > 0) return;
     setIsLoading(true);
     setError(null);
 
@@ -221,6 +231,11 @@ export function Login({ onLogin }: LoginProps) {
         }
 
         /* Error */
+        .session-banner {
+          background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px;
+          padding: 11px 14px; margin-bottom: 20px; font-size: 13px; color: #92400e;
+          display: flex; align-items: center; gap: 8px;
+        }
         .error-box {
           background: #fef2f2;
           border: 1px solid #fca5a5;
@@ -233,6 +248,9 @@ export function Login({ onLogin }: LoginProps) {
           align-items: center;
           gap: 8px;
         }
+        .field input.error { border-color: #fca5a5 !important; background: #fff5f5 !important; }
+        .field input.error:focus { border-color: #ef4444 !important; box-shadow: 0 0 0 3px rgba(239,68,68,0.08) !important; }
+        .field-error { font-size: 11.5px; color: #ef4444; margin-top: 5px; display: flex; align-items: center; gap: 4px; }
 
         /* Form */
         .field { margin-bottom: 18px; }
@@ -421,24 +439,33 @@ export function Login({ onLogin }: LoginProps) {
             )}
 
             <form onSubmit={handleSubmit}>
+              {sessionExpired && (
+                <div className="session-banner">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  Sua sessão expirou. Por favor, faça login novamente.
+                </div>
+              )}
               {isRegistering && (
                 <div className="field">
                   <label>Nome Completo</label>
-                  <input type="text" placeholder="Digite seu nome" value={name}
-                    onChange={(e) => setName(e.target.value)} required />
+                  <input type="text" placeholder="Digite seu nome" value={name} className={fieldErrors.name ? 'error' : ''}
+                    onChange={(e) => { setName(e.target.value); if(fieldErrors.name) setFieldErrors(p=>({...p,name:''})); }} />
+                  {fieldErrors.name && <p className="field-error"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>{fieldErrors.name}</p>}
                 </div>
               )}
 
               <div className="field">
                 <label>E-mail</label>
-                <input type="email" placeholder="seu.email@empresa.com" value={email}
-                  onChange={(e) => setEmail(e.target.value)} required />
+                <input type="email" placeholder="seu.email@empresa.com" value={email} className={fieldErrors.email ? 'error' : ''}
+                  onChange={(e) => { setEmail(e.target.value); if(fieldErrors.email) setFieldErrors(p=>({...p,email:''})); }} />
+                {fieldErrors.email && <p className="field-error"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>{fieldErrors.email}</p>}
               </div>
 
               <div className="field">
                 <label>Senha</label>
-                <input type="password" placeholder="••••••••" value={password}
-                  onChange={(e) => setPassword(e.target.value)} required />
+                <input type="password" placeholder="••••••••" value={password} className={fieldErrors.password ? 'error' : ''}
+                  onChange={(e) => { setPassword(e.target.value); if(fieldErrors.password) setFieldErrors(p=>({...p,password:''})); }} />
+                {fieldErrors.password && <p className="field-error"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>{fieldErrors.password}</p>}
               </div>
 
               {isRegistering && (

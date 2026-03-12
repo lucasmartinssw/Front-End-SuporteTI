@@ -29,6 +29,9 @@ const styles = `
     outline: none; transition: all 0.2s; box-sizing: border-box;
   }
   .af-input::placeholder, .af-textarea::placeholder { color: #c4c9d4; }
+  .af-input.error, .af-select.error { border-color: #fca5a5; background: #fff5f5; }
+  .af-input.error:focus { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.08); }
+  .af-error-msg { font-size: 11.5px; color: #ef4444; margin-top: 5px; display: flex; align-items: center; gap: 4px; }
   .af-input:focus, .af-select:focus, .af-textarea:focus {
     border-color: #6366f1; background: #fff; box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
   }
@@ -116,9 +119,15 @@ export function AssetForm({ onSubmit, onCancel, initial }: AssetFormProps) {
   const [status, setStatus] = useState<Asset['status']>(initial?.status || 'ativo');
   const [observacoes, setObservacoes] = useState(initial?.observacoes || '');
 
+  const [errors, setErrors] = useState<Record<string,string>>({});
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nome.trim()) return;
+    const errs: Record<string,string> = {};
+    if (!nome.trim()) errs.nome = 'Nome do ativo é obrigatório.';
+    else if (nome.trim().length < 3) errs.nome = 'Mínimo de 3 caracteres.';
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
     onSubmit({ nome: nome.trim(), tipo, numero_serie: numeroSerie || undefined, patrimonio: patrimonio || undefined, localizacao: localizacao || undefined, status, observacoes: observacoes || undefined });
   };
 
@@ -137,7 +146,8 @@ export function AssetForm({ onSubmit, onCancel, initial }: AssetFormProps) {
 
             <div className="af-field">
               <label className="af-label">Nome do Equipamento <span>*</span></label>
-              <input className="af-input" value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Notebook Dell Latitude 5520" required />
+              <input className={`af-input${errors.nome ? ' error' : ''}`} value={nome} onChange={e => { setNome(e.target.value); if(errors.nome) setErrors(p=>({...p,nome:''})); }} placeholder="Ex: Notebook Dell Latitude 5520" />
+              {errors.nome && <p className="af-error-msg"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>{errors.nome}</p>}
             </div>
 
             <div className="af-field">
