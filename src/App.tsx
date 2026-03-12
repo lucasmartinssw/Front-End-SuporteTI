@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import iconImg from './assets/Icon test blue simple.png';
 import { exportDashboardPDF } from './pdfExport';
 import { chamados as chamadosApi, ativos as ativosApi, users as usersApi, notificacoes as notificacoesApi, setToken, STATUS_MAP, PRIORITY_MAP, STATUS_ID_MAP, PRIORITY_ID_MAP, Notificacao } from './api';
+import { computeSLA } from './sla';
 import { AssetList, Asset } from './components/AssetList';
 import { AssetForm } from './components/AssetForm';
 import { AssetDetail } from './components/AssetDetail';
@@ -471,6 +472,10 @@ export default function App() {
     open: tickets.filter(t => t.status === 'open').length,
     inProgress: tickets.filter(t => t.status === 'in-progress').length,
     resolved: tickets.filter(t => t.status === 'resolved').length,
+    overdue: tickets.filter(t => {
+      if (t.status !== 'open' && t.status !== 'in-progress') return false;
+      return computeSLA(t.priority, t.status, t.createdAt).status === 'overdue';
+    }).length,
   };
   const statusData = [
     { name: 'Aberto', value: allStats.open, color: STATUS_COLORS['Aberto'] },
@@ -669,19 +674,20 @@ export default function App() {
       </div>
 
       {/* System-wide stat cards */}
-      <div className="stat-grid">
+      <div className="stat-grid" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
         {[
           { cls: 'total', label: 'Total', value: allStats.total, color: '#6366f1', trend: '+12% este mês', trendColor: '#10b981', iconPath: 'M2 7h20v14H2zM16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16' },
           { cls: 'open', label: 'Abertos', value: allStats.open, color: '#f59e0b', trend: `${allStats.open} aguardando`, trendColor: '#f59e0b', iconPath: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2' },
           { cls: 'inprogress', label: 'Em Progresso', value: allStats.inProgress, color: '#3b82f6', trend: 'Em atendimento', trendColor: '#3b82f6', iconPath: 'M23 6L13.5 15.5 8.5 10.5 1 18M17 6h6v6' },
           { cls: 'resolved', label: 'Resolvidos', value: allStats.resolved, color: '#10b981', trend: '+5 esta semana', trendColor: '#10b981', iconPath: 'M20 6L9 17l-5-5' },
+          { cls: 'overdue-sla', label: 'SLA Vencido', value: allStats.overdue, color: '#ef4444', trend: allStats.overdue > 0 ? 'Requer atenção' : 'Tudo no prazo', trendColor: allStats.overdue > 0 ? '#ef4444' : '#10b981', iconPath: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01' },
         ].map(s => (
-          <div key={s.cls} className={`stat-card ${s.cls}`}>
-            <div className="stat-icon">
+          <div key={s.cls} className={`stat-card ${s.cls}`} style={s.cls === 'overdue-sla' ? {'--card-accent':'#ef4444'} as any : {}}>
+            <div className="stat-icon" style={s.cls === 'overdue-sla' ? {background: allStats.overdue > 0 ? '#fef2f2' : '#ecfdf5'} : {}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={s.iconPath}/></svg>
             </div>
             <p className="stat-label">{s.label}</p>
-            <p className="stat-value">{s.value}</p>
+            <p className="stat-value" style={s.cls === 'overdue-sla' && allStats.overdue > 0 ? {color:'#ef4444'} : {}}>{s.value}</p>
             <p className="stat-trend" style={{ color: s.trendColor }}>{s.trend}</p>
           </div>
         ))}

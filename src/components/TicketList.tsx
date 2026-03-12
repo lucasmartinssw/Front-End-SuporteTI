@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Ticket } from './TicketForm';
+import { computeSLA, SLA_COLORS, SLAInfo } from '../sla';
 
 interface TicketListProps {
   tickets: Ticket[];
@@ -312,9 +313,54 @@ const styles = `
   }
 
   .tl-action-select:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.08); }
+
+  /* SLA chip */
+  .sla-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    font-family: 'DM Sans', sans-serif;
+  }
 `;
 
+/** Ticks every minute so SLA countdowns stay live */
+function useTick(intervalMs = 60_000) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
+/** Small inline SLA chip shown in ticket rows */
+function SLAChip({ sla }: { sla: SLAInfo }) {
+  if (!sla.isActive) return null;
+  const c = SLA_COLORS[sla.status];
+  return (
+    <span
+      className="sla-chip"
+      style={{ background: c.bg, color: c.text, borderColor: c.border }}
+      title={`SLA: ${sla.label} (limite ${sla.limitH}h)`}
+    >
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        {sla.status === 'overdue'
+          ? <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>
+          : <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>}
+      </svg>
+      {sla.label}
+    </span>
+  );
+}
+
 export function TicketList({ tickets, userRole, userEmail, isLoading = false, technicians, onTicketSelect, onStatusUpdate, onAddTecnico, onRemoveTecnico }: TicketListProps) {
+  const now = useTick();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -444,6 +490,7 @@ export function TicketList({ tickets, userRole, userEmail, isLoading = false, te
                       {getStatusLabel(ticket.status)}
                     </span>
                     <span className={`badge ${getPriorityClass(ticket.priority)}`}>{getPriorityLabel(ticket.priority)}</span>
+                    <SLAChip sla={computeSLA(ticket.priority, ticket.status, ticket.createdAt, now)} />
                   </div>
                   <p className="tl-desc">{ticket.description}</p>
                   <div className="tl-meta">
