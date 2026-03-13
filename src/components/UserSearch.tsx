@@ -158,5 +158,3 @@ function UserRow({ user, query, onClick }: { user: UserEntry; query: string; onC
     </div>
   );
 }
-
-const TABS = ['Chamados', 'Comentários', 'Ativos'];

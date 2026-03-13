@@ -908,7 +908,7 @@ export function TicketDetail({ ticket, userRole, userEmail, userAvatar, technici
                     <option value="resolved">Resolvido</option>
                     <option value="closed">Fechado</option>
                   </select>
-                  {true && (
+                  {
                     <>
                       <p className="td-action-label">Técnicos</p>
                       {(ticket.tecnicos || []).map((tc: any) => (
@@ -928,7 +928,7 @@ export function TicketDetail({ ticket, userRole, userEmail, userAvatar, technici
                         ))}
                       </select>
                     </>
-                  )}
+                  }
                 </div>
               </div>
             )}

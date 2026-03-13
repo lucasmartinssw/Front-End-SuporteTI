@@ -15,8 +15,8 @@ interface Props {
 }
 
 const CARGO_LABEL: Record<string, string> = {
-  admin: 'Analista TI',
-  tecnico: 'Analista TI',
+  admin: 'Administrador',
+  tecnico: 'Técnico TI',
   usuario: 'Usuário',
 };
 const CARGO_COLOR: Record<string, string> = {
@@ -187,7 +187,7 @@ export function UserManagement({ onBack }: Props) {
           </div>
           <select className="um-select" value={cargoFilter} onChange={e => setCargoFilter(e.target.value)}>
             <option value="all">Todos os cargos</option>
-            <option value="tecnico">Analista TI</option>
+            <option value="tecnico">Técnico TI</option>
             <option value="usuario">Usuário</option>
           </select>
         </div>
@@ -280,7 +280,7 @@ export function UserManagement({ onBack }: Props) {
               <label className="um-label">Cargo</label>
               <select className="um-input" value={formCargo} onChange={e => setFormCargo(e.target.value)} style={{ cursor: 'pointer' }}>
                 <option value="usuario">Usuário</option>
-                <option value="tecnico">Analista TI</option>
+                <option value="tecnico">Técnico TI</option>
               </select>
             </div>
             {formError && <p className="um-error">{formError}</p>}

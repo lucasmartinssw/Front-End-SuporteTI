@@ -5,6 +5,7 @@ interface AssetFormProps {
   onSubmit: (data: Omit<Asset, 'id' | 'created_at' | 'updated_at' | 'chamados' | 'responsavel_nome' | 'responsavel_email'>, files: File[]) => void;
   onCancel: () => void;
   initial?: Partial<Asset>;
+  technicians?: { id: number; nome: string; email: string }[];
 }
 
 const styles = `
@@ -56,16 +57,17 @@ const styles = `
   .af-tipo-btn.active { background: #eef2ff; border-color: #6366f1; color: #4f46e5; }
 
   /* Status selector */
-  .af-status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .af-status-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
   .af-status-btn {
     height: 38px; border-radius: 9px; border: 1.5px solid #e5e7eb; background: #fafbfc;
     font-size: 12px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer;
     transition: all 0.18s; display: flex; align-items: center; justify-content: center; gap: 5px; color: #6b7280;
   }
   .af-status-btn .dot { width: 6px; height: 6px; border-radius: 50%; }
-  .af-status-btn.st-ativo.active { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
+  .af-status-btn.st-disponivel.active { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
+  .af-status-btn.st-em_uso.active { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
   .af-status-btn.st-manutencao.active { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
-  .af-status-btn.st-reserva.active { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+  .af-status-btn.st-emprestado.active { background: #f5f3ff; border-color: #c4b5fd; color: #6d28d9; }
   .af-status-btn.st-desativado.active { background: #f3f4f6; border-color: #d1d5db; color: #4b5563; }
 
   .af-actions { display: flex; gap: 10px; margin-top: 8px; }
@@ -116,19 +118,21 @@ const TIPOS = [
 ] as const;
 
 const STATUS_OPTIONS = [
-  { value: 'ativo', label: 'Ativo', cls: 'st-ativo', dotColor: '#10b981' },
+  { value: 'disponivel', label: 'Disponível', cls: 'st-disponivel', dotColor: '#10b981' },
+  { value: 'em_uso', label: 'Em Uso', cls: 'st-em_uso', dotColor: '#3b82f6' },
   { value: 'manutencao', label: 'Manutenção', cls: 'st-manutencao', dotColor: '#f97316' },
-  { value: 'reserva', label: 'Reserva', cls: 'st-reserva', dotColor: '#3b82f6' },
+  { value: 'emprestado', label: 'Emprestado', cls: 'st-emprestado', dotColor: '#8b5cf6' },
   { value: 'desativado', label: 'Desativado', cls: 'st-desativado', dotColor: '#9ca3af' },
 ] as const;
 
-export function AssetForm({ onSubmit, onCancel, initial }: AssetFormProps) {
+export function AssetForm({ onSubmit, onCancel, initial, technicians = [] }: AssetFormProps) {
   const [nome, setNome] = useState(initial?.nome || '');
   const [tipo, setTipo] = useState<Asset['tipo']>(initial?.tipo || 'computador');
   const [numeroSerie, setNumeroSerie] = useState(initial?.numero_serie || '');
   const [patrimonio, setPatrimonio] = useState(initial?.patrimonio || '');
   const [localizacao, setLocalizacao] = useState(initial?.localizacao || '');
-  const [status, setStatus] = useState<Asset['status']>(initial?.status || 'ativo');
+  const [status, setStatus] = useState<Asset['status']>(initial?.status || 'disponivel');
+  const [responsavelId, setResponsavelId] = useState<number | ''>(initial?.responsavel_id || '');
   const [observacoes, setObservacoes] = useState(initial?.observacoes || '');
   const [warrantyExpiresAt, setWarrantyExpiresAt] = useState(initial?.warranty_expires_at || '');
 
@@ -144,7 +148,7 @@ export function AssetForm({ onSubmit, onCancel, initial }: AssetFormProps) {
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
     onSubmit(
-      { nome: nome.trim(), tipo, numero_serie: numeroSerie || undefined, patrimonio: patrimonio || undefined, localizacao: localizacao || undefined, status, observacoes: observacoes || undefined, warranty_expires_at: warrantyExpiresAt || undefined },
+      { nome: nome.trim(), tipo, numero_serie: numeroSerie || undefined, patrimonio: patrimonio || undefined, localizacao: localizacao || undefined, status, responsavel_id: responsavelId || undefined, observacoes: observacoes || undefined, warranty_expires_at: warrantyExpiresAt || undefined },
       stagedFiles
     );
   };
@@ -194,6 +198,16 @@ export function AssetForm({ onSubmit, onCancel, initial }: AssetFormProps) {
             <div className="af-field">
               <label className="af-label">Localização</label>
               <input className="af-input" value={localizacao} onChange={e => setLocalizacao(e.target.value)} placeholder="Ex: Sala TI, Recepção, Rack Principal..." />
+            </div>
+
+            <div className="af-field">
+              <label className="af-label">Responsável</label>
+              <select className="af-select" value={responsavelId} onChange={e => setResponsavelId(e.target.value ? Number(e.target.value) : '')}>
+                <option value="">— Sem responsável —</option>
+                {technicians.map(t => (
+                  <option key={t.id} value={t.id}>{t.nome} ({t.email})</option>
+                ))}
+              </select>
             </div>
 
             <p className="af-section-title" style={{ marginTop: 8 }}>Status</p>

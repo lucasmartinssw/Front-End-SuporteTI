@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Ticket } from './TicketForm';
 import { computeSLA, SLA_COLORS, SLAInfo } from '../sla';
 

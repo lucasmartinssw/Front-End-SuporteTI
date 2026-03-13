@@ -27,9 +27,10 @@ const TIPO_ICONS: Record<string, string> = {
 };
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string; dot: string }> = {
-  ativo:       { label: 'Ativo',        bg: '#ecfdf5', color: '#065f46', dot: '#10b981' },
+  disponivel:  { label: 'Disponível',   bg: '#ecfdf5', color: '#065f46', dot: '#10b981' },
+  em_uso:      { label: 'Em Uso',       bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6' },
   manutencao:  { label: 'Manutenção',   bg: '#fffbeb', color: '#92400e', dot: '#f59e0b' },
-  reserva:     { label: 'Reserva',      bg: '#eff6ff', color: '#1d4ed8', dot: '#3b82f6' },
+  emprestado:  { label: 'Emprestado',   bg: '#f5f3ff', color: '#6d28d9', dot: '#8b5cf6' },
   desativado:  { label: 'Desativado',   bg: '#f3f4f6', color: '#4b5563', dot: '#9ca3af' },
 };
 
@@ -72,8 +73,7 @@ export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivat
   const [observacoes, setObservacoes] = useState(asset.observacoes || '');
   const [warrantyExpiresAt, setWarrantyExpiresAt] = useState(asset.warranty_expires_at || '');
 
-  const statusCfg = STATUS_CONFIG[asset.status] || STATUS_CONFIG.ativo;
-  const editStatusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.ativo;
+  const statusCfg = STATUS_CONFIG[asset.status] || STATUS_CONFIG.disponivel;
 
   const handleSave = async () => {
     if (!nome.trim()) { setError('Nome é obrigatório.'); return; }
@@ -157,7 +157,7 @@ export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivat
         .ad-status-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600; }
         .ad-status-dot { width:6px; height:6px; border-radius:50%; }
 
-        .ad-status-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .ad-status-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
         .ad-status-btn { height:38px; border-radius:9px; border:1.5px solid #e5e7eb; background:#fff; font-size:12.5px; font-weight:500; font-family:'DM Sans',sans-serif; cursor:pointer; transition:all 0.18s; display:flex; align-items:center; justify-content:center; gap:6px; }
         .ad-status-btn.active { border-color:transparent; }
         .ad-status-btn:hover { border-color:#6366f1; }

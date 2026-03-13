@@ -119,7 +119,7 @@ export function AuditLog({ type, id, titulo, onBack }: AuditLogProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetch = async () => {
+    const loadEntries = async () => {
       setLoading(true);
       try {
         const data = type === 'chamado'
@@ -132,7 +132,7 @@ export function AuditLog({ type, id, titulo, onBack }: AuditLogProps) {
         setLoading(false);
       }
     };
-    fetch();
+    loadEntries();
   }, [type, id]);
 
   const fmtDate = (s: string) =>
