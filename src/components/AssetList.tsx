@@ -8,7 +8,7 @@ export interface Asset {
   numero_serie?: string;
   patrimonio?: string;
   localizacao?: string;
-  status: 'ativo' | 'manutencao' | 'reserva' | 'desativado';
+  status: 'disponivel' | 'em_uso' | 'manutencao' | 'emprestado' | 'desativado';
   responsavel_id?: number;
   responsavel_nome?: string;
   responsavel_email?: string;
@@ -16,6 +16,7 @@ export interface Asset {
   warranty_expires_at?: string | null;
   created_at: string;
   updated_at: string;
+  chamados_count?: number;
   chamados?: any[];
 }
 
@@ -106,12 +107,14 @@ const styles = `
 
   .al-status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 600; }
   .al-status-badge .dot { width: 6px; height: 6px; border-radius: 50%; }
-  .s-ativo { background: #ecfdf5; color: #065f46; }
-  .s-ativo .dot { background: #10b981; }
+  .s-disponivel { background: #ecfdf5; color: #065f46; }
+  .s-disponivel .dot { background: #10b981; }
+  .s-em_uso { background: #eff6ff; color: #1d4ed8; }
+  .s-em_uso .dot { background: #3b82f6; }
   .s-manutencao { background: #fff7ed; color: #9a3412; }
   .s-manutencao .dot { background: #f97316; }
-  .s-reserva { background: #eff6ff; color: #1d4ed8; }
-  .s-reserva .dot { background: #3b82f6; }
+  .s-emprestado { background: #f5f3ff; color: #6d28d9; }
+  .s-emprestado .dot { background: #8b5cf6; }
   .s-desativado { background: #f3f4f6; color: #6b7280; }
   .s-desativado .dot { background: #9ca3af; }
 
@@ -159,25 +162,6 @@ const TIPO_LABELS: Record<string, string> = {
   telefone: 'Telefone', servidor: 'Servidor', switch: 'Switch', outro: 'Outro',
 };
 
-const TIPO_ICONS: Record<string, string> = {
-  computador: 'M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16',
-  monitor: 'M20 3H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1zM8 21h8m-4-4v4',
-  impressora: 'M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z',
-  telefone: 'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z',
-  servidor: 'M2 9h20v6H2zM2 3h20v6H2zM2 15h20v6H2zM6 6h.01M6 12h.01M6 18h.01',
-  switch: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
-  outro: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 6v4m0 4h.01',
-};
-
-// Mock data — replace with real API call
-const MOCK_ASSETS: Asset[] = [
-  { id: 1, nome: 'Notebook Dell Latitude', tipo: 'computador', numero_serie: 'SN-2024-001', patrimonio: 'PAT-001', localizacao: 'Sala TI', status: 'ativo', responsavel_nome: 'João Silva', created_at: '2024-01-10T08:00:00', updated_at: '2024-01-15T10:00:00', chamados: [{}] },
-  { id: 2, nome: 'Monitor LG 24"', tipo: 'monitor', numero_serie: 'SN-2024-002', patrimonio: 'PAT-002', localizacao: 'RH', status: 'ativo', responsavel_nome: 'Maria Santos', created_at: '2024-01-10T08:00:00', updated_at: '2024-01-10T08:00:00', chamados: [] },
-  { id: 3, nome: 'Impressora HP LaserJet', tipo: 'impressora', numero_serie: 'SN-2023-015', patrimonio: 'PAT-015', localizacao: 'Recepção', status: 'manutencao', responsavel_nome: 'João Silva', created_at: '2023-06-01T08:00:00', updated_at: '2024-01-14T09:00:00', chamados: [{}, {}] },
-  { id: 4, nome: 'Switch Cisco 24p', tipo: 'switch', numero_serie: 'SN-2022-003', patrimonio: 'PAT-003', localizacao: 'Rack Principal', status: 'ativo', responsavel_nome: 'Carlos Tech', created_at: '2022-03-15T08:00:00', updated_at: '2022-03-15T08:00:00', chamados: [] },
-  { id: 5, nome: 'Servidor Dell PowerEdge', tipo: 'servidor', numero_serie: 'SN-2021-001', patrimonio: 'PAT-004', localizacao: 'Sala Servidores', status: 'ativo', responsavel_nome: 'Carlos Tech', created_at: '2021-01-20T08:00:00', updated_at: '2024-01-01T08:00:00', chamados: [{}, {}, {}] },
-];
-
 export function AssetList({ assets, isLoading = false, onSelectAsset, onNewAsset }: AssetListProps) {
   const [search, setSearch] = useState('');
   const [filterTipo, setFilterTipo] = useState('');
@@ -202,20 +186,20 @@ export function AssetList({ assets, isLoading = false, onSelectAsset, onNewAsset
 
   const stats = {
     total: assets.length,
-    ativos: assets.filter(a => a.status === 'ativo').length,
+    em_uso: assets.filter(a => a.status === 'em_uso').length,
     manutencao: assets.filter(a => a.status === 'manutencao').length,
     desativados: assets.filter(a => a.status === 'desativado').length,
   };
 
-  const statusClass = (s: string) => ({ ativo: 's-ativo', manutencao: 's-manutencao', reserva: 's-reserva', desativado: 's-desativado' }[s] || '');
-  const statusLabel = (s: string) => ({ ativo: 'Ativo', manutencao: 'Manutenção', reserva: 'Reserva', desativado: 'Desativado' }[s] || s);
+  const statusClass = (s: string) => ({ disponivel: 's-disponivel', em_uso: 's-em_uso', manutencao: 's-manutencao', emprestado: 's-emprestado', desativado: 's-desativado' }[s] || '');
+  const statusLabel = (s: string) => ({ disponivel: 'Disponível', em_uso: 'Em Uso', manutencao: 'Manutenção', emprestado: 'Emprestado', desativado: 'Desativado' }[s] || s);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const exportCSV = () => {
-    const STATUS_LABEL: Record<string,string> = { ativo:'Ativo', manutencao:'Manutenção', reserva:'Reserva', desativado:'Desativado' };
+    const STATUS_LABEL: Record<string,string> = { disponivel:'Disponível', em_uso:'Em Uso', manutencao:'Manutenção', emprestado:'Emprestado', desativado:'Desativado' };
     const header = ['ID','Nome','Tipo','Nº Série','Patrimônio','Localização','Status','Responsável'];
     const rows = filtered.map(a => [
       a.id,
@@ -253,7 +237,7 @@ export function AssetList({ assets, isLoading = false, onSelectAsset, onNewAsset
         <div className="al-stats">
           {[
             { label: 'Total', value: stats.total, bg: '#eef2ff', color: '#6366f1', iconPath: 'M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 1 1 0 10h-2M8 12h8' },
-            { label: 'Ativos', value: stats.ativos, bg: '#ecfdf5', color: '#10b981', iconPath: 'M20 6L9 17l-5-5' },
+            { label: 'Em Uso', value: stats.em_uso, bg: '#eff6ff', color: '#3b82f6', iconPath: 'M20 6L9 17l-5-5' },
             { label: 'Em Manutenção', value: stats.manutencao, bg: '#fff7ed', color: '#f97316', iconPath: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z' },
             { label: 'Desativados', value: stats.desativados, bg: '#f3f4f6', color: '#9ca3af', iconPath: 'M18 6L6 18M6 6l12 12' },
           ].map(s => (
@@ -278,9 +262,10 @@ export function AssetList({ assets, isLoading = false, onSelectAsset, onNewAsset
           </select>
           <select className="al-filter-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
             <option value="">Todos os status</option>
-            <option value="ativo">Ativo</option>
+            <option value="disponivel">Disponível</option>
+            <option value="em_uso">Em Uso</option>
             <option value="manutencao">Manutenção</option>
-            <option value="reserva">Reserva</option>
+            <option value="emprestado">Emprestado</option>
             <option value="desativado">Desativado</option>
           </select>
           <button

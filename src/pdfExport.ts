@@ -32,7 +32,7 @@ const PRIORITY_COLOR: Record<string, string> = {
   low: '#10b981', medium: '#f59e0b', high: '#f97316', urgent: '#ef4444',
 };
 const ATIVO_STATUS_LABEL: Record<string, string> = {
-  ativo: 'Ativo', manutencao: 'Manutenção', reserva: 'Reserva', desativado: 'Desativado',
+  disponivel: 'Disponível', em_uso: 'Em Uso', manutencao: 'Manutenção', emprestado: 'Emprestado', desativado: 'Desativado',
 };
 
 function fmtDate(d: Date | string) {
@@ -373,7 +373,7 @@ export async function exportAssetPDF(asset: any) {
 
 export async function exportDashboardPDF(stats: {
   total: number; open: number; inProgress: number; resolved: number; closed: number;
-  assets: { total: number; ativo: number; manutencao: number; desativado: number };
+  assets: { total: number; em_uso: number; manutencao: number; desativado: number };
   weekData: { day: string; abertos: number; resolvidos: number }[];
   topCategories: { name: string; count: number }[];
   generatedBy: string;
@@ -427,7 +427,7 @@ export async function exportDashboardPDF(stats: {
 
   const assetCards = [
     { label: 'Total', value: stats.assets.total, color: '#6366f1' },
-    { label: 'Ativos', value: stats.assets.ativo, color: '#10b981' },
+    { label: 'Em Uso', value: stats.assets.em_uso, color: '#3b82f6' },
     { label: 'Manutenção', value: stats.assets.manutencao, color: '#f97316' },
     { label: 'Desativados', value: stats.assets.desativado, color: '#9ca3af' },
   ];

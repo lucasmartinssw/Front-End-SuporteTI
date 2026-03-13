@@ -711,7 +711,7 @@ export default function App() {
       closed: tickets.filter(t => t.status === 'closed').length,
       assets: {
         total: assets.length,
-        ativo: assets.filter(a => a.status === 'ativo').length,
+        em_uso: assets.filter(a => a.status === 'em_uso').length,
         manutencao: assets.filter(a => a.status === 'manutencao').length,
         desativado: assets.filter(a => a.status === 'desativado').length,
       },
@@ -1053,6 +1053,7 @@ export default function App() {
           )}
           {activeView === 'asset-form' && userRole === 'it-executive' && (
             <AssetForm
+              technicians={technicians}
               onSubmit={async (data, files) => {
                 try {
                   const result = await ativosApi.create(data as any);

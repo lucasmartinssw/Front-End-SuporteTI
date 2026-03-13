@@ -232,11 +232,12 @@ export interface AtivoFromAPI {
   numero_serie?: string;
   patrimonio?: string;
   localizacao?: string;
-  status: 'ativo' | 'manutencao' | 'reserva' | 'desativado';
+  status: 'disponivel' | 'em_uso' | 'manutencao' | 'emprestado' | 'desativado';
   responsavel_id?: number;
   responsavel_nome?: string;
   responsavel_email?: string;
   observacoes?: string;
+  warranty_expires_at?: string | null;
   created_at: string;
   updated_at: string;
   chamados?: ChamadoFromAPI[];
@@ -248,6 +249,7 @@ export interface CreateAtivoPayload {
   numero_serie?: string;
   patrimonio?: string;
   localizacao?: string;
+  warranty_expires_at?: string;
   status?: AtivoFromAPI['status'];
   responsavel_id?: number;
   observacoes?: string;
@@ -390,7 +392,7 @@ export const STATUS_ID_MAP: Record<string, number> = {
   'open': 1,
   'in-progress': 2,
   'resolved': 3,
-  'closed': 3,
+  'closed': 4,
 };
 
 export const PRIORITY_MAP: Record<number, string> = {

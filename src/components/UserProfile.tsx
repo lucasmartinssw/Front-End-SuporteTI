@@ -128,7 +128,7 @@ export function UserProfile({ onBack, onTicketSelect, onNameChange, onAvatarChan
   };
 
   const cargoLabel = (cargo: string) => ({
-    admin: 'Analista TI',
+    admin: 'Administrador',
     tecnico: 'Técnico TI',
     usuario: 'Usuário',
   }[cargo] || cargo);
@@ -365,8 +365,8 @@ export function UserProfile({ onBack, onTicketSelect, onNameChange, onAvatarChan
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 3 }}>{a.nome}</div>
                         <div style={{ fontSize: 12, color: '#9ca3af' }}>{a.tipo}{a.localizacao ? ` · ${a.localizacao}` : ''}{a.patrimonio ? ` · ${a.patrimonio}` : ''}</div>
                       </div>
-                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: a.status === 'ativo' ? '#d1fae5' : '#f3f4f6', color: a.status === 'ativo' ? '#059669' : '#6b7280' }}>
-                        {a.status}
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: a.status === 'desativado' ? '#f3f4f6' : '#d1fae5', color: a.status === 'desativado' ? '#6b7280' : '#059669' }}>
+                        {{ disponivel: 'Disponível', em_uso: 'Em Uso', manutencao: 'Manutenção', emprestado: 'Emprestado', desativado: 'Desativado' }[a.status] || a.status}
                       </span>
                     </div>
                   ))}
