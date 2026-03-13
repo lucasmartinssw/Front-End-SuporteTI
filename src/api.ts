@@ -208,7 +208,7 @@ export const chamados = {
     files?: File[]
   ) => {
     const form = new FormData();
-    form.append('mensagem', mensagem);
+    form.append('mensagem', mensagem || '');
     form.append('is_internal', String(isInternal));
     if (files?.length) {
       files.forEach(f => form.append('files', f));
@@ -289,6 +289,18 @@ export const ativos = {
     request<{ message: string }>(`/ativos/${ativoId}/chamados/${chamadoId}`, {
       method: 'DELETE',
     }),
+
+  uploadFiles: (ativoId: number, files: File[]) => {
+    const form = new FormData();
+    files.forEach(f => form.append('files', f));
+    return request<{ message: string; files: { id: string; url: string; type: string; name: string }[] }>(
+      `/ativos/${ativoId}/files`,
+      { method: 'POST', body: form }
+    );
+  },
+
+  deleteFile: (ativoId: number, fileId: string) =>
+    request<{ message: string }>(`/ativos/${ativoId}/files/${fileId}`, { method: 'DELETE' }),
 };
 
 // ─────────────────────────────────────────────────────────────

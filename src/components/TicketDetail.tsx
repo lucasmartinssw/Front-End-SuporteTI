@@ -421,6 +421,31 @@ const styles = `
   .sla-bar-fill { height: 100%; border-radius: 99px; transition: width 1s linear; }
   .sla-label { font-size: 13px; font-weight: 600; }
   .sla-limit { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+
+  /* Lightbox */
+  .td-lightbox-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    cursor: zoom-out;
+    animation: td-fade-in 0.15s ease;
+  }
+  @keyframes td-fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .td-lightbox-img {
+    max-width: 90vw; max-height: 88vh;
+    border-radius: 10px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    cursor: default;
+    object-fit: contain;
+  }
+  .td-lightbox-close {
+    position: fixed; top: 20px; right: 24px;
+    background: rgba(255,255,255,0.12); border: none; color: #fff;
+    width: 36px; height: 36px; border-radius: 50%;
+    font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .td-lightbox-close:hover { background: rgba(255,255,255,0.25); }
 `;
 
 export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack, onAddComment, onRefreshComments, onStatusUpdate, onAddTecnico, onRemoveTecnico, assets = [], onAssetLinked, onAssetUnlinked, onShowHistory }: TicketDetailProps) {
@@ -505,6 +530,7 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
   const getInitials = (email: string) => email.split('@')[0].slice(0, 2).toUpperCase();
 
   const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const handleDeleteComment = async (commentId: string) => {
     if (!window.confirm('Apagar esta mensagem?')) return;
@@ -597,9 +623,9 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
                     {ticket.attachments.map(att => {
                       const isImage = att.type?.startsWith('image/');
                       return isImage ? (
-                        <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer">
+                        <button key={att.id} onClick={() => setLightboxUrl(att.url)} style={{background:'none',border:'none',padding:0,cursor:'zoom-in'}}>
                           <img className="td-attach-img" src={att.url} alt={att.name} />
-                        </a>
+                        </button>
                       ) : (
                         <a key={att.id} className="td-attach-item" href={att.url} target="_blank" rel="noopener noreferrer">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -653,9 +679,9 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
                                 {comment.attachments.map(att => {
                                   const isImage = att.type?.startsWith('image/');
                                   return isImage ? (
-                                    <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer">
+                                    <button key={att.id} onClick={() => setLightboxUrl(att.url)} style={{background:'none',border:'none',padding:0,cursor:'zoom-in'}}>
                                       <img className="td-msg-attach-img" src={att.url} alt={att.name} />
-                                    </a>
+                                    </button>
                                   ) : (
                                     <a key={att.id} className="td-msg-attach-file" href={att.url} target="_blank" rel="noopener noreferrer">
                                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -941,6 +967,17 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
           </div>
         </div>
       </div>
+      {lightboxUrl && (
+        <div className="td-lightbox-overlay" onClick={() => setLightboxUrl(null)}>
+          <button className="td-lightbox-close" onClick={() => setLightboxUrl(null)}>✕</button>
+          <img
+            className="td-lightbox-img"
+            src={lightboxUrl}
+            alt="Imagem anexada"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
     </>
   );
 }

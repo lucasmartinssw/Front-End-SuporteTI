@@ -3,6 +3,7 @@ import iconImg from './assets/Icon test blue simple.png';
 import { exportDashboardPDF } from './pdfExport';
 import { chamados as chamadosApi, ativos as ativosApi, users as usersApi, notificacoes as notificacoesApi, setToken, STATUS_MAP, PRIORITY_MAP, STATUS_ID_MAP, PRIORITY_ID_MAP, Notificacao } from './api';
 import { computeSLA } from './sla';
+import { computeWarranty } from './warranty';
 import { AssetList, Asset } from './components/AssetList';
 import { AssetForm } from './components/AssetForm';
 import { AssetDetail } from './components/AssetDetail';
@@ -189,7 +190,9 @@ export default function App() {
   const [userRole, setUserRole] = useState<'client' | 'it-executive'>(() => (localStorage.getItem('auth_role') as any) || 'client');
   const [userEmail, setUserEmail] = useState(() => localStorage.getItem('auth_email') || '');
   const [userName, setUserName] = useState(() => localStorage.getItem('auth_name') || '');
-  const [activeView, setActiveView] = useState<'dashboard' | 'tickets' | 'submit' | 'detail' | 'assets' | 'asset-form' | 'asset-detail' | 'audit-chamado' | 'audit-ativo'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'tickets' | 'submit' | 'detail' | 'assets' | 'asset-form' | 'asset-detail' | 'audit-chamado' | 'audit-ativo'>(() => {
+    return (sessionStorage.getItem('nav_view') as any) || 'dashboard';
+  });
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -203,6 +206,16 @@ export default function App() {
     const stored = localStorage.getItem('auth_token');
     if (stored) setToken(stored);
   }, []);
+
+  // Persist nav state to sessionStorage whenever it changes
+  useEffect(() => { sessionStorage.setItem('nav_view', activeView); }, [activeView]);
+
+  // Wrap setActiveView to also clear stale selected IDs when navigating away
+  const navTo = (view: typeof activeView) => {
+    if (view !== 'detail') sessionStorage.removeItem('nav_ticket_id');
+    if (view !== 'asset-detail') sessionStorage.removeItem('nav_asset_id');
+    setActiveView(view);
+  };
 
   // Load tickets and assets from API when authenticated
   useEffect(() => {
@@ -303,6 +316,22 @@ export default function App() {
     }
   };
 
+  // After data loads, restore selected ticket/asset from sessionStorage
+  useEffect(() => {
+    const savedTicketId = sessionStorage.getItem('nav_ticket_id');
+    const savedAssetId = sessionStorage.getItem('nav_asset_id');
+    if (savedTicketId && tickets.length > 0) {
+      const t = tickets.find(t => t.id === savedTicketId);
+      if (t) setSelectedTicket(t);
+      else { sessionStorage.removeItem('nav_ticket_id'); navTo('tickets'); }
+    }
+    if (savedAssetId && assets.length > 0) {
+      const a = assets.find(a => String(a.id) === savedAssetId);
+      if (a) setSelectedAsset(a as any);
+      else { sessionStorage.removeItem('nav_asset_id'); navTo('assets'); }
+    }
+  }, [tickets, assets]);
+
   if (!isAuthenticated) {
     return <Login sessionExpired={sessionExpired} onLogin={(email, role, name, token) => {
       setSessionExpired(false);
@@ -333,7 +362,7 @@ export default function App() {
         await chamadosApi.create(payload);
       }
       await loadData();
-      setActiveView('tickets');
+      navTo('tickets');
       toast.success('Chamado enviado com sucesso!');
     } catch (err: any) {
       toast.error(err.message || 'Erro ao criar chamado.');
@@ -422,7 +451,8 @@ export default function App() {
 
   const handleTicketSelect = async (ticket: Ticket) => {
     setSelectedTicket(ticket);
-    setActiveView('detail');
+    sessionStorage.setItem('nav_ticket_id', ticket.id);
+    navTo('detail');
     // Load messages from API
     try {
       const msgs = await chamadosApi.listMensagens(Number(ticket.id));
@@ -477,6 +507,11 @@ export default function App() {
       return computeSLA(t.priority, t.status, t.createdAt).status === 'overdue';
     }).length,
   };
+
+  const warrantyAlerts = assets.filter(a => {
+    const w = computeWarranty(a.warranty_expires_at);
+    return w.status === 'expiring' || w.status === 'expired';
+  }).length;
   const statusData = [
     { name: 'Aberto', value: allStats.open, color: STATUS_COLORS['Aberto'] },
     { name: 'Em Progresso', value: allStats.inProgress, color: STATUS_COLORS['Em Progresso'] },
@@ -536,7 +571,7 @@ export default function App() {
           <h1 className="dash-title">Meu Painel</h1>
           <p className="dash-sub">Acompanhe seus chamados enviados à equipe de TI</p>
         </div>
-        <button className="btn-primary" onClick={() => setActiveView('submit')}>
+        <button className="btn-primary" onClick={() => navTo('submit')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Novo Chamado
         </button>
@@ -568,7 +603,7 @@ export default function App() {
           </div>
           <p className="user-empty-title">Nenhum chamado enviado ainda</p>
           <p className="user-empty-sub">Abra seu primeiro chamado e nossa equipe entrará em contato.</p>
-          <button className="btn-primary" onClick={() => setActiveView('submit')}>
+          <button className="btn-primary" onClick={() => navTo('submit')}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Abrir primeiro chamado
           </button>
@@ -579,7 +614,7 @@ export default function App() {
           <div className="d-card">
             <div className="d-card-hdr">
               <div className="d-card-title">Meus chamados recentes</div>
-              <button onClick={() => setActiveView('tickets')} style={{ fontSize: 11.5, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>Ver todos →</button>
+              <button onClick={() => navTo('tickets')} style={{ fontSize: 11.5, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>Ver todos →</button>
             </div>
             <div className="d-card-body" style={{ padding: '10px 18px' }}>
               <div className="recent-list">
@@ -674,20 +709,24 @@ export default function App() {
       </div>
 
       {/* System-wide stat cards */}
-      <div className="stat-grid" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
+      <div className="stat-grid" style={{gridTemplateColumns:'repeat(6,1fr)'}}>
         {[
           { cls: 'total', label: 'Total', value: allStats.total, color: '#6366f1', trend: '+12% este mês', trendColor: '#10b981', iconPath: 'M2 7h20v14H2zM16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16' },
           { cls: 'open', label: 'Abertos', value: allStats.open, color: '#f59e0b', trend: `${allStats.open} aguardando`, trendColor: '#f59e0b', iconPath: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 6v6l4 2' },
           { cls: 'inprogress', label: 'Em Progresso', value: allStats.inProgress, color: '#3b82f6', trend: 'Em atendimento', trendColor: '#3b82f6', iconPath: 'M23 6L13.5 15.5 8.5 10.5 1 18M17 6h6v6' },
           { cls: 'resolved', label: 'Resolvidos', value: allStats.resolved, color: '#10b981', trend: '+5 esta semana', trendColor: '#10b981', iconPath: 'M20 6L9 17l-5-5' },
           { cls: 'overdue-sla', label: 'SLA Vencido', value: allStats.overdue, color: '#ef4444', trend: allStats.overdue > 0 ? 'Requer atenção' : 'Tudo no prazo', trendColor: allStats.overdue > 0 ? '#ef4444' : '#10b981', iconPath: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01' },
+          { cls: 'warranty-alert', label: 'Garantias', value: warrantyAlerts, color: '#f97316', trend: warrantyAlerts > 0 ? 'Vencidas/a vencer' : 'Tudo em dia', trendColor: warrantyAlerts > 0 ? '#f97316' : '#10b981', iconPath: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z' },
         ].map(s => (
           <div key={s.cls} className={`stat-card ${s.cls}`} style={s.cls === 'overdue-sla' ? {'--card-accent':'#ef4444'} as any : {}}>
-            <div className="stat-icon" style={s.cls === 'overdue-sla' ? {background: allStats.overdue > 0 ? '#fef2f2' : '#ecfdf5'} : {}}>
+            <div className="stat-icon" style={s.cls === 'overdue-sla' ? {background: allStats.overdue > 0 ? '#fef2f2' : '#ecfdf5'} : s.cls === 'warranty-alert' ? {background: warrantyAlerts > 0 ? '#fff7ed' : '#ecfdf5'} : {}}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={s.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={s.iconPath}/></svg>
             </div>
             <p className="stat-label">{s.label}</p>
-            <p className="stat-value" style={s.cls === 'overdue-sla' && allStats.overdue > 0 ? {color:'#ef4444'} : {}}>{s.value}</p>
+            <p className="stat-value" style={
+              (s.cls === 'overdue-sla' && allStats.overdue > 0) ? {color:'#ef4444'} :
+              (s.cls === 'warranty-alert' && warrantyAlerts > 0) ? {color:'#f97316'} : {}
+            }>{s.value}</p>
             <p className="stat-trend" style={{ color: s.trendColor }}>{s.trend}</p>
           </div>
         ))}
@@ -804,7 +843,7 @@ export default function App() {
         <div className="d-card">
           <div className="d-card-hdr">
             <div className="d-card-title">Chamados recentes</div>
-            <button onClick={() => setActiveView('tickets')} style={{ fontSize: 11.5, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>Ver todos →</button>
+            <button onClick={() => navTo('tickets')} style={{ fontSize: 11.5, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'DM Sans, sans-serif' }}>Ver todos →</button>
           </div>
           <div className="d-card-body" style={{ padding: '10px 18px' }}>
             <div className="recent-list">
@@ -844,15 +883,15 @@ export default function App() {
                 <span className="logo-text">Suporte TI</span>
               </div>
               <nav className="app-nav">
-                <button className={`nav-btn ${activeView === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveView('dashboard')}>Dashboard</button>
-                <button className={`nav-btn ${activeView === 'tickets' || activeView === 'detail' ? 'active' : ''}`} onClick={() => setActiveView('tickets')}>
+                <button className={`nav-btn ${activeView === 'dashboard' ? 'active' : ''}`} onClick={() => navTo('dashboard')}>Dashboard</button>
+                <button className={`nav-btn ${activeView === 'tickets' || activeView === 'detail' ? 'active' : ''}`} onClick={() => navTo('tickets')}>
                   {userRole === 'client' ? 'Meus Chamados' : 'Todos os Chamados'}
                 </button>
                 {userRole === 'client' && (
-                  <button className={`nav-btn ${activeView === 'submit' ? 'active' : ''}`} onClick={() => setActiveView('submit')}>Enviar Chamado</button>
+                  <button className={`nav-btn ${activeView === 'submit' ? 'active' : ''}`} onClick={() => navTo('submit')}>Enviar Chamado</button>
                 )}
                 {userRole === 'it-executive' && (
-                  <button className={`nav-btn ${activeView === 'assets' || activeView === 'asset-form' || activeView === 'asset-detail' ? 'active' : ''}`} onClick={() => setActiveView('assets')}>
+                  <button className={`nav-btn ${activeView === 'assets' || activeView === 'asset-form' || activeView === 'asset-detail' ? 'active' : ''}`} onClick={() => navTo('assets')}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline',marginRight:5,verticalAlign:'middle'}}><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                     Ativos
                   </button>
@@ -895,7 +934,7 @@ export default function App() {
                             } else {
                               // Ticket not in current list — reload data then navigate
                               await loadData();
-                              setActiveView('tickets');
+                              navTo('tickets');
                             }
                             setShowNotifs(false);
                           }}>
@@ -919,7 +958,7 @@ export default function App() {
                 {userRole === 'client' ? 'Usuário' : 'Analista TI'}
               </span>
               <span className="welcome-badge">Bem-vindo, <strong>{userName}</strong></span>
-              <button className="btn-ghost" onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_role'); localStorage.removeItem('auth_email'); localStorage.removeItem('auth_name'); setIsAuthenticated(false); setAuthToken(null); setToken(null); setTickets([]); setAssets([]); setNotificacoes([]); setShowNotifs(false); }}>Sair</button>
+              <button className="btn-ghost" onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_role'); localStorage.removeItem('auth_email'); localStorage.removeItem('auth_name'); sessionStorage.removeItem('nav_view'); sessionStorage.removeItem('nav_ticket_id'); sessionStorage.removeItem('nav_asset_id'); setIsAuthenticated(false); setAuthToken(null); setToken(null); setTickets([]); setAssets([]); setNotificacoes([]); setShowNotifs(false); navTo('dashboard'); }}>Sair</button>
             </div>
           </div>
         </header>
@@ -939,7 +978,7 @@ export default function App() {
               userEmail={userEmail}
               technicians={technicians}
               assets={assets}
-              onBack={() => setActiveView('tickets')}
+              onBack={() => navTo('tickets')}
               onAddComment={handleAddComment}
               onRefreshComments={handleRefreshComments}
               onStatusUpdate={handleStatusUpdate}
@@ -956,52 +995,55 @@ export default function App() {
                   ? { ...a, chamados: (a.chamados || []).filter((c: any) => String(c.id) !== String(selectedTicket?.id)) }
                   : a));
               }}
-              onShowHistory={() => setActiveView('audit-chamado')}
+              onShowHistory={() => navTo('audit-chamado')}
             />
           )}
           {activeView === 'assets' && userRole === 'it-executive' && (
             <AssetList
               assets={assets}
               isLoading={isLoadingAssets}
-              onSelectAsset={(asset) => { setSelectedAsset(asset); setActiveView('asset-detail'); }}
-              onNewAsset={() => setActiveView('asset-form')}
+              onSelectAsset={(asset) => { setSelectedAsset(asset); sessionStorage.setItem('nav_asset_id', String(asset.id)); navTo('asset-detail'); }}
+              onNewAsset={() => navTo('asset-form')}
             />
           )}
           {activeView === 'asset-form' && userRole === 'it-executive' && (
             <AssetForm
-              onSubmit={async (data) => {
+              onSubmit={async (data, files) => {
                 try {
-                  await ativosApi.create(data as any);
+                  const result = await ativosApi.create(data as any);
+                  if (files.length > 0 && result.id) {
+                    try { await ativosApi.uploadFiles(result.id, files); } catch {}
+                  }
                   const refreshed = await ativosApi.list();
                   setAssets(refreshed as any);
-                  setActiveView('assets');
+                  navTo('assets');
                   toast.success('Ativo cadastrado com sucesso!');
                 } catch (err: any) {
                   toast.error(err.message || 'Erro ao cadastrar ativo.');
                 }
               }}
-              onCancel={() => setActiveView('assets')}
+              onCancel={() => navTo('assets')}
             />
           )}
           {activeView === 'asset-detail' && selectedAsset && userRole === 'it-executive' && (
             <AssetDetail
               asset={selectedAsset}
               technicians={technicians}
-              onBack={() => setActiveView('assets')}
+              onBack={() => navTo('assets')}
               onUpdated={(updated) => {
                 setAssets(prev => prev.map(a => a.id === updated.id ? updated : a));
                 setSelectedAsset(updated);
               }}
               onDeactivated={() => {
                 setAssets(prev => prev.map(a => a.id === selectedAsset.id ? { ...a, status: 'desativado' } : a));
-                setActiveView('assets');
+                navTo('assets');
                 toast.success('Ativo desativado.');
               }}
               onTicketSelect={(chamadoId) => {
                 const t = tickets.find(t => Number(t.id) === chamadoId);
                 if (t) { handleTicketSelect(t); }
               }}
-              onShowHistory={() => setActiveView('audit-ativo')}
+              onShowHistory={() => navTo('audit-ativo')}
             />
           )}
           {activeView === 'audit-chamado' && selectedTicket && (
@@ -1009,7 +1051,7 @@ export default function App() {
               type="chamado"
               id={Number(selectedTicket.id)}
               titulo={selectedTicket.title}
-              onBack={() => setActiveView('detail')}
+              onBack={() => navTo('detail')}
             />
           )}
           {activeView === 'audit-ativo' && selectedAsset && (
@@ -1017,7 +1059,7 @@ export default function App() {
               type="ativo"
               id={selectedAsset.id}
               titulo={selectedAsset.nome}
-              onBack={() => setActiveView('asset-detail')}
+              onBack={() => navTo('asset-detail')}
             />
           )}
         </main>
