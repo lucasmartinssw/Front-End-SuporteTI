@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { computeWarranty, WARRANTY_COLORS } from '../warranty';
 
 export interface Asset {
   id: number;
@@ -12,6 +13,7 @@ export interface Asset {
   responsavel_nome?: string;
   responsavel_email?: string;
   observacoes?: string;
+  warranty_expires_at?: string | null;
   created_at: string;
   updated_at: string;
   chamados?: any[];
@@ -57,6 +59,16 @@ const styles = `
     appearance: none; cursor: pointer; outline: none; transition: border-color 0.18s;
   }
   .al-filter-select:focus { border-color: #6366f1; }
+  .al-sort-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 36px; padding: 0 12px; flex-shrink: 0;
+    border: 1.5px solid #e5e7eb; border-radius: 9px;
+    background: #fff; font-size: 12.5px; font-weight: 600; color: #6b7280;
+    cursor: pointer; white-space: nowrap; transition: all 0.18s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .al-sort-btn:hover { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
+  .al-sort-btn.active { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
 
   .al-search {
     flex: 1; min-width: 180px; padding: 8px 14px; border: 1.5px solid #e5e7eb; border-radius: 9px;
@@ -109,6 +121,9 @@ const styles = `
   .al-empty-sub { font-size: 13px; color: #9ca3af; }
 
   .al-ticket-count { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: #6b7280; background: #f3f4f6; padding: 2px 8px; border-radius: 20px; }
+
+  /* Warranty badge */
+  .al-warranty-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
   .al-export-btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; background: #fff; border: 1px solid #f0f1f5; border-radius: 9px; font-size: 12.5px; font-weight: 600; color: #6b7280; cursor: pointer; font-family: 'DM Sans',sans-serif; transition: all 0.18s; white-space: nowrap; }
   .al-export-btn:hover { background: #f7f8fc; color: #111827; }
   .al-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
@@ -167,6 +182,7 @@ export function AssetList({ assets, isLoading = false, onSelectAsset, onNewAsset
   const [search, setSearch] = useState('');
   const [filterTipo, setFilterTipo] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 12;
@@ -179,6 +195,9 @@ export function AssetList({ assets, isLoading = false, onSelectAsset, onNewAsset
     const matchTipo = !filterTipo || a.tipo === filterTipo;
     const matchStatus = !filterStatus || a.status === filterStatus;
     return matchSearch && matchTipo && matchStatus;
+  }).sort((a, b) => {
+    const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    return sortOrder === 'newest' ? -diff : diff;
   });
 
   const stats = {
@@ -264,6 +283,18 @@ export function AssetList({ assets, isLoading = false, onSelectAsset, onNewAsset
             <option value="reserva">Reserva</option>
             <option value="desativado">Desativado</option>
           </select>
+          <button
+            className={`al-sort-btn${sortOrder === 'oldest' ? ' active' : ''}`}
+            onClick={() => setSortOrder(o => o === 'newest' ? 'oldest' : 'newest')}
+            title={sortOrder === 'newest' ? 'Mais recentes primeiro — clique para inverter' : 'Mais antigos primeiro — clique para inverter'}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              {sortOrder === 'newest'
+                ? <><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></>
+                : <><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></>}
+            </svg>
+            {sortOrder === 'newest' ? 'Mais recentes' : 'Mais antigos'}
+          </button>
         </div>
 
         {/* Toolbar */}
@@ -279,7 +310,7 @@ export function AssetList({ assets, isLoading = false, onSelectAsset, onNewAsset
         <div className="al-table-wrap">
           {isLoading ? (
             <table className="al-table">
-              <thead><tr><th>Equipamento</th><th>Tipo</th><th>Localização</th><th>Status</th><th>Responsável</th><th>Chamados</th></tr></thead>
+              <thead><tr><th>Equipamento</th><th>Tipo</th><th>Localização</th><th>Status</th><th>Responsável</th><th>Garantia</th><th>Chamados</th></tr></thead>
               <tbody>
                 {[1,2,3,4,5].map(i => (
                   <tr key={i}>
@@ -310,6 +341,7 @@ export function AssetList({ assets, isLoading = false, onSelectAsset, onNewAsset
                   <th>Localização</th>
                   <th>Status</th>
                   <th>Responsável</th>
+                  <th>Garantia</th>
                   <th>Chamados</th>
                 </tr>
               </thead>
@@ -332,6 +364,19 @@ export function AssetList({ assets, isLoading = false, onSelectAsset, onNewAsset
                       </span>
                     </td>
                     <td>{asset.responsavel_nome || '—'}</td>
+                    <td>
+                      {(() => {
+                        const w = computeWarranty(asset.warranty_expires_at);
+                        if (w.status === 'none') return <span style={{ color: '#d1d5db', fontSize: 12 }}>—</span>;
+                        const c = WARRANTY_COLORS[w.status];
+                        return (
+                          <span className="al-warranty-badge" style={{ background: c.bg, color: c.text, borderColor: c.border }}>
+                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: c.dot, display: 'inline-block', flexShrink: 0 }} />
+                            {w.label}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td>
                       <span className="al-ticket-count">
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>

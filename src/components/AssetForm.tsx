@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Asset } from './AssetList';
 
 interface AssetFormProps {
-  onSubmit: (data: Omit<Asset, 'id' | 'created_at' | 'updated_at' | 'chamados' | 'responsavel_nome' | 'responsavel_email'>) => void;
+  onSubmit: (data: Omit<Asset, 'id' | 'created_at' | 'updated_at' | 'chamados' | 'responsavel_nome' | 'responsavel_email'>, files: File[]) => void;
   onCancel: () => void;
   initial?: Partial<Asset>;
 }
@@ -70,6 +70,18 @@ const styles = `
 
   .af-actions { display: flex; gap: 10px; margin-top: 8px; }
 
+  /* File staging */
+  .af-file-zone { border: 2px dashed #e0e7ff; border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: all 0.18s; text-align: center; }
+  .af-file-zone:hover { border-color: #a5b4fc; background: #f5f3ff; }
+  .af-file-zone-label { font-size: 13px; color: #6366f1; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .af-file-zone-sub { font-size: 11.5px; color: #9ca3af; margin-top: 3px; }
+  .af-file-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .af-file-chip { display: inline-flex; align-items: center; gap: 6px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 8px; padding: 5px 8px; font-size: 12px; color: #374151; max-width: 180px; }
+  .af-file-thumb { width: 28px; height: 28px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+  .af-file-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .af-file-remove { background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 12px; padding: 0 0 0 2px; flex-shrink: 0; line-height: 1; }
+  .af-file-remove:hover { color: #ef4444; }
+
   .af-submit {
     flex: 1; height: 44px; background: linear-gradient(135deg, #4f46e5, #6366f1); color: #fff;
     border: none; border-radius: 10px; font-size: 14px; font-weight: 600; font-family: 'DM Sans', sans-serif;
@@ -118,8 +130,11 @@ export function AssetForm({ onSubmit, onCancel, initial }: AssetFormProps) {
   const [localizacao, setLocalizacao] = useState(initial?.localizacao || '');
   const [status, setStatus] = useState<Asset['status']>(initial?.status || 'ativo');
   const [observacoes, setObservacoes] = useState(initial?.observacoes || '');
+  const [warrantyExpiresAt, setWarrantyExpiresAt] = useState(initial?.warranty_expires_at || '');
 
   const [errors, setErrors] = useState<Record<string,string>>({});
+  const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,7 +143,10 @@ export function AssetForm({ onSubmit, onCancel, initial }: AssetFormProps) {
     else if (nome.trim().length < 3) errs.nome = 'Mínimo de 3 caracteres.';
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
-    onSubmit({ nome: nome.trim(), tipo, numero_serie: numeroSerie || undefined, patrimonio: patrimonio || undefined, localizacao: localizacao || undefined, status, observacoes: observacoes || undefined });
+    onSubmit(
+      { nome: nome.trim(), tipo, numero_serie: numeroSerie || undefined, patrimonio: patrimonio || undefined, localizacao: localizacao || undefined, status, observacoes: observacoes || undefined, warranty_expires_at: warrantyExpiresAt || undefined },
+      stagedFiles
+    );
   };
 
   return (
@@ -194,6 +212,55 @@ export function AssetForm({ onSubmit, onCancel, initial }: AssetFormProps) {
             <div className="af-field">
               <label className="af-label">Observações</label>
               <textarea className="af-textarea" value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Informações adicionais, histórico de compra, configurações especiais..." />
+            </div>
+
+            <div className="af-field">
+              <label className="af-label">Garantia até</label>
+              <input
+                type="date"
+                className="af-input"
+                value={warrantyExpiresAt}
+                onChange={e => setWarrantyExpiresAt(e.target.value)}
+              />
+            </div>
+
+            <div className="af-field">
+              <label className="af-label">Fotos / Anexos</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                style={{display:'none'}}
+                onChange={e => {
+                  const picked = Array.from(e.target.files || []);
+                  setStagedFiles(prev => [...prev, ...picked]);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+              />
+              <div className="af-file-zone" onClick={() => fileInputRef.current?.click()}>
+                <p className="af-file-zone-label">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                  Clique para anexar arquivos
+                </p>
+                <p className="af-file-zone-sub">Imagens, PDFs, documentos — qualquer tipo</p>
+              </div>
+              {stagedFiles.length > 0 && (
+                <div className="af-file-preview">
+                  {stagedFiles.map((f, i) => {
+                    const isImage = f.type.startsWith('image/');
+                    return (
+                      <div key={i} className="af-file-chip">
+                        {isImage
+                          ? <img className="af-file-thumb" src={URL.createObjectURL(f)} alt={f.name} />
+                          : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        }
+                        <span className="af-file-chip-name">{f.name}</span>
+                        <button type="button" className="af-file-remove" onClick={e => { e.stopPropagation(); setStagedFiles(prev => prev.filter((_,j) => j !== i)); }}>✕</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="af-actions">

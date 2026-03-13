@@ -31,9 +31,10 @@ async function request<T>(
     ...(options.headers as Record<string, string>),
   };
 
-  // Attach JWT token if available
-  if (_token) {
-    headers['Authorization'] = `Bearer ${_token}`;
+  // Attach JWT token if available — fall back to localStorage on page refresh
+  const token = _token || localStorage.getItem('auth_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   // Only set Content-Type to JSON if we're not sending FormData
@@ -208,7 +209,7 @@ export const chamados = {
     files?: File[]
   ) => {
     const form = new FormData();
-    form.append('mensagem', mensagem);
+    form.append('mensagem', mensagem || '');
     form.append('is_internal', String(isInternal));
     if (files?.length) {
       files.forEach(f => form.append('files', f));
@@ -289,6 +290,18 @@ export const ativos = {
     request<{ message: string }>(`/ativos/${ativoId}/chamados/${chamadoId}`, {
       method: 'DELETE',
     }),
+
+  uploadFiles: (ativoId: number, files: File[]) => {
+    const form = new FormData();
+    files.forEach(f => form.append('files', f));
+    return request<{ message: string; files: { id: string; url: string; type: string; name: string }[] }>(
+      `/ativos/${ativoId}/files`,
+      { method: 'POST', body: form }
+    );
+  },
+
+  deleteFile: (ativoId: number, fileId: string) =>
+    request<{ message: string }>(`/ativos/${ativoId}/files/${fileId}`, { method: 'DELETE' }),
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -337,7 +350,28 @@ export const notificacoes = {
 };
 
 export const users = {
-  list: (cargo?: string) => request<UserFromAPI[]>(cargo ? `/users?cargo=${cargo}` : '/users'),
+  list: (cargo?: string, includeInactive?: boolean) => request<UserFromAPI[]>(`/users${cargo ? `?cargo=${cargo}` : ''}${includeInactive ? `${cargo ? '&' : '?'}include_inactive=true` : ''}`),
+  getMe: () => request<any>('/users/me'),
+  getUserProfile: (id: number) => request<any>(`/users/${id}/profile`),
+  updateMe: (data: { nome?: string; bio?: string }) => request<{ message: string }>('/users/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+  updateUser: (id: number, data: { nome?: string; cargo?: string }) =>
+    request<{ message: string }>(`/users/${id}/admin`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+  resetPassword: (id: number, nova_senha: string) =>
+    request<{ message: string }>(`/users/${id}/reset-password`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nova_senha }) }),
+  deactivateUser: (id: number) =>
+    request<{ message: string }>(`/users/${id}/deactivate`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }),
+  uploadAvatar: async (file: File): Promise<{ avatar_url: string }> => {
+    const token = localStorage.getItem('auth_token');
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${BASE_URL}/users/me/avatar`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
 };
 
 // ─────────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ interface TicketDetailProps {
   ticket: Ticket;
   userRole: 'client' | 'it-executive';
   userEmail: string;
+  userAvatar?: string | null;
   onBack: () => void;
   onAddComment: (ticketId: string, comment: string, isInternal: boolean, files?: File[]) => void;
   onRefreshComments: (ticketId: string) => void;
@@ -421,9 +422,34 @@ const styles = `
   .sla-bar-fill { height: 100%; border-radius: 99px; transition: width 1s linear; }
   .sla-label { font-size: 13px; font-weight: 600; }
   .sla-limit { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+
+  /* Lightbox */
+  .td-lightbox-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.85); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    cursor: zoom-out;
+    animation: td-fade-in 0.15s ease;
+  }
+  @keyframes td-fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .td-lightbox-img {
+    max-width: 90vw; max-height: 88vh;
+    border-radius: 10px;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    cursor: default;
+    object-fit: contain;
+  }
+  .td-lightbox-close {
+    position: fixed; top: 20px; right: 24px;
+    background: rgba(255,255,255,0.12); border: none; color: #fff;
+    width: 36px; height: 36px; border-radius: 50%;
+    font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .td-lightbox-close:hover { background: rgba(255,255,255,0.25); }
 `;
 
-export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack, onAddComment, onRefreshComments, onStatusUpdate, onAddTecnico, onRemoveTecnico, assets = [], onAssetLinked, onAssetUnlinked, onShowHistory }: TicketDetailProps) {
+export function TicketDetail({ ticket, userRole, userEmail, userAvatar, technicians, onBack, onAddComment, onRefreshComments, onStatusUpdate, onAddTecnico, onRemoveTecnico, assets = [], onAssetLinked, onAssetUnlinked, onShowHistory }: TicketDetailProps) {
   // Live clock for SLA countdown — ticks every minute
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -505,6 +531,7 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
   const getInitials = (email: string) => email.split('@')[0].slice(0, 2).toUpperCase();
 
   const [deletingMsgId, setDeletingMsgId] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const handleDeleteComment = async (commentId: string) => {
     if (!window.confirm('Apagar esta mensagem?')) return;
@@ -597,9 +624,9 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
                     {ticket.attachments.map(att => {
                       const isImage = att.type?.startsWith('image/');
                       return isImage ? (
-                        <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer">
+                        <button key={att.id} onClick={() => setLightboxUrl(att.url)} style={{background:'none',border:'none',padding:0,cursor:'zoom-in'}}>
                           <img className="td-attach-img" src={att.url} alt={att.name} />
-                        </a>
+                        </button>
                       ) : (
                         <a key={att.id} className="td-attach-item" href={att.url} target="_blank" rel="noopener noreferrer">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -627,8 +654,11 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
                       const isMe = comment.author === userEmail;
                       return (
                         <div key={comment.id} className="td-comment">
-                          <div className={`td-avatar ${isMe ? 'td-avatar-me' : 'td-avatar-other'}`}>
-                            {getInitials(comment.author)}
+                          <div className={`td-avatar ${isMe ? 'td-avatar-me' : 'td-avatar-other'}`} style={{overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            {isMe && userAvatar
+                              ? <img src={userAvatar} alt="avatar" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                              : getInitials(comment.author)
+                            }
                           </div>
                           <div className={`td-comment-bubble ${comment.isInternal ? 'internal' : ''}`}>
                             <div className="td-comment-top">
@@ -653,9 +683,9 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
                                 {comment.attachments.map(att => {
                                   const isImage = att.type?.startsWith('image/');
                                   return isImage ? (
-                                    <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer">
+                                    <button key={att.id} onClick={() => setLightboxUrl(att.url)} style={{background:'none',border:'none',padding:0,cursor:'zoom-in'}}>
                                       <img className="td-msg-attach-img" src={att.url} alt={att.name} />
-                                    </a>
+                                    </button>
                                   ) : (
                                     <a key={att.id} className="td-msg-attach-file" href={att.url} target="_blank" rel="noopener noreferrer">
                                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -783,11 +813,11 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
                   <svg className="td-info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   <div><p className="td-info-label">Atualizado em</p><p className="td-info-value">{formatDate(ticket.updatedAt)}</p></div>
                 </div>
-                {ticket.tecnicos && ticket.tecnicos.length > 0 && (
-                  <div className="td-info-row">
-                    <svg className="td-info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    <div>
-                      <p className="td-info-label">Técnicos</p>
+                <div className="td-info-row">
+                  <svg className="td-info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <div>
+                    <p className="td-info-label">Técnico responsável</p>
+                    {ticket.tecnicos && ticket.tecnicos.length > 0 ? (
                       <div style={{display:'flex',flexWrap:'wrap',gap:4,marginTop:4}}>
                         {(ticket.tecnicos || []).map((tc: any) => (
                           <span key={tc.id} style={{display:'inline-flex',alignItems:'center',gap:4,background:'#eef2ff',color:'#4f46e5',borderRadius:20,padding:'3px 8px',fontSize:11.5,fontWeight:600}}>
@@ -795,9 +825,11 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
                           </span>
                         ))}
                       </div>
-                    </div>
+                    ) : (
+                      <p className="td-info-value" style={{color:'#9ca3af',fontStyle:'italic'}}>Aguardando atribuição</p>
+                    )}
                   </div>
-                )}
+                </div>
                 {ticket.assetId && (
                   <div className="td-info-row" style={{marginTop:4}}>
                     <svg className="td-info-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0891b2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
@@ -941,6 +973,17 @@ export function TicketDetail({ ticket, userRole, userEmail, technicians, onBack,
           </div>
         </div>
       </div>
+      {lightboxUrl && (
+        <div className="td-lightbox-overlay" onClick={() => setLightboxUrl(null)}>
+          <button className="td-lightbox-close" onClick={() => setLightboxUrl(null)}>✕</button>
+          <img
+            className="td-lightbox-img"
+            src={lightboxUrl}
+            alt="Imagem anexada"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
     </>
   );
 }

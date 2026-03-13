@@ -94,6 +94,16 @@ const styles = `
   }
 
   .tl-select:focus { border-color: #6366f1; background-color: #fff; box-shadow: 0 0 0 3px rgba(99,102,241,0.08); }
+  .tl-sort-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 36px; padding: 0 12px;
+    border: 1.5px solid #e5e7eb; border-radius: 9px;
+    background: #fff; font-size: 12.5px; font-weight: 600; color: #6b7280;
+    cursor: pointer; white-space: nowrap; transition: all 0.18s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .tl-sort-btn:hover { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
+  .tl-sort-btn.active { border-color: #6366f1; color: #6366f1; background: #eef2ff; }
 
   .tl-count {
     margin-left: auto;
@@ -364,6 +374,9 @@ export function TicketList({ tickets, userRole, userEmail, isLoading = false, te
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 15;
@@ -373,7 +386,12 @@ export function TicketList({ tickets, userRole, userEmail, isLoading = false, te
     if (searchTerm && !ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) && !ticket.description.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     if (statusFilter !== 'all' && ticket.status !== statusFilter) return false;
     if (priorityFilter !== 'all' && ticket.priority !== priorityFilter) return false;
+    if (dateFrom) { const from = new Date(dateFrom); from.setHours(0,0,0,0); if (ticket.createdAt < from) return false; }
+    if (dateTo) { const to = new Date(dateTo); to.setHours(23,59,59,999); if (ticket.createdAt > to) return false; }
     return true;
+  }).sort((a, b) => {
+    const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    return sortOrder === 'newest' ? -diff : diff;
   });
 
   // Reset to page 1 when filters change
@@ -432,6 +450,32 @@ export function TicketList({ tickets, userRole, userEmail, isLoading = false, te
             <option value="medium">Médio</option>
             <option value="low">Baixo</option>
           </select>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            title="De"
+            style={{ height: 38, border: '1.5px solid #e5e7eb', borderRadius: 9, padding: '0 10px', fontSize: 13, color: dateFrom ? '#111827' : '#9ca3af', fontFamily: 'DM Sans, sans-serif', background: '#fff', cursor: 'pointer', outline: 'none' }}
+          />
+          <input
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            title="Até"
+            style={{ height: 38, border: '1.5px solid #e5e7eb', borderRadius: 9, padding: '0 10px', fontSize: 13, color: dateTo ? '#111827' : '#9ca3af', fontFamily: 'DM Sans, sans-serif', background: '#fff', cursor: 'pointer', outline: 'none' }}
+          />
+          <button
+            className={`tl-sort-btn${sortOrder === 'oldest' ? ' active' : ''}`}
+            onClick={() => setSortOrder(o => o === 'newest' ? 'oldest' : 'newest')}
+            title={sortOrder === 'newest' ? 'Mais recentes primeiro — clique para inverter' : 'Mais antigos primeiro — clique para inverter'}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              {sortOrder === 'newest'
+                ? <><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></>
+                : <><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></>}
+            </svg>
+            {sortOrder === 'newest' ? 'Mais recentes' : 'Mais antigos'}
+          </button>
         </div>
 
         <div className="tl-toolbar">
@@ -468,12 +512,12 @@ export function TicketList({ tickets, userRole, userEmail, isLoading = false, te
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             </div>
             <p className="tl-empty-title">
-              {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all'
+              {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' || dateFrom || dateTo
                 ? 'Nenhum resultado encontrado'
                 : userRole === 'client' ? 'Você ainda não tem chamados' : 'Nenhum chamado no sistema'}
             </p>
             <p className="tl-empty-sub">
-              {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all'
+              {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' || dateFrom || dateTo
                 ? 'Tente ajustar os filtros ou limpar a pesquisa.'
                 : userRole === 'client' ? 'Clique em "Enviar Chamado" para abrir seu primeiro chamado.' : 'Os chamados aparecerão aqui assim que forem criados.'}
             </p>

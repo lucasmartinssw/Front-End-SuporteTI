@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { exportAssetPDF } from '../pdfExport';
 import { Asset } from './AssetList';
 import { ativos } from '../api';
+import { computeWarranty, WARRANTY_COLORS } from '../warranty';
+
+
 
 interface AssetDetailProps {
   asset: Asset;
@@ -45,8 +48,17 @@ export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivat
   // Full asset data (loaded from API to get chamados)
   const [fullAsset, setFullAsset] = useState<Asset>(asset);
 
+  // File attachments
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [assetFiles, setAssetFiles] = useState<{id:string;url:string;type:string;name:string}[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
   useEffect(() => {
-    ativos.get(asset.id).then(data => setFullAsset(data as any)).catch(() => {});
+    ativos.get(asset.id).then(data => {
+      setFullAsset(data as any);
+      setAssetFiles((data as any).files || []);
+    }).catch(() => {});
   }, [asset.id]);
 
   // Edit form state
@@ -58,6 +70,7 @@ export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivat
   const [status, setStatus] = useState(asset.status);
   const [responsavelId, setResponsavelId] = useState<number | ''>(asset.responsavel_id || '');
   const [observacoes, setObservacoes] = useState(asset.observacoes || '');
+  const [warrantyExpiresAt, setWarrantyExpiresAt] = useState(asset.warranty_expires_at || '');
 
   const statusCfg = STATUS_CONFIG[asset.status] || STATUS_CONFIG.ativo;
   const editStatusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.ativo;
@@ -67,9 +80,9 @@ export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivat
     setIsSaving(true);
     setError(null);
     try {
-      await ativos.update(asset.id, { nome, tipo, numero_serie: numeroSerie || undefined, patrimonio: patrimonio || undefined, localizacao: localizacao || undefined, status, responsavel_id: responsavelId || undefined, observacoes: observacoes || undefined });
+      await ativos.update(asset.id, { nome, tipo, numero_serie: numeroSerie || undefined, patrimonio: patrimonio || undefined, localizacao: localizacao || undefined, status, responsavel_id: responsavelId || undefined, observacoes: observacoes || undefined, warranty_expires_at: warrantyExpiresAt || undefined });
       const updatedTech = technicians.find(t => t.id === responsavelId);
-      onUpdated({ ...asset, nome, tipo, numero_serie: numeroSerie || undefined, patrimonio: patrimonio || undefined, localizacao: localizacao || undefined, status, responsavel_id: responsavelId || undefined, responsavel_nome: updatedTech?.nome, responsavel_email: updatedTech?.email, observacoes: observacoes || undefined });
+      onUpdated({ ...asset, nome, tipo, numero_serie: numeroSerie || undefined, patrimonio: patrimonio || undefined, localizacao: localizacao || undefined, status, responsavel_id: responsavelId || undefined, responsavel_nome: updatedTech?.nome, responsavel_email: updatedTech?.email, observacoes: observacoes || undefined, warranty_expires_at: warrantyExpiresAt || undefined });
       setIsEditing(false);
     } catch (err: any) {
       setError(err.message || 'Erro ao salvar.');
@@ -163,6 +176,38 @@ export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivat
         .ad-confirm-title { font-family:'Sora',sans-serif; font-size:17px; font-weight:700; color:#0f1117; margin-bottom:8px; }
         .ad-confirm-sub { font-size:13.5px; color:#6b7280; margin-bottom:22px; line-height:1.5; }
         .ad-confirm-btns { display:flex; gap:10px; justify-content:flex-end; }
+
+        .ad-qr-card { background:#fff; border:1px solid #f0f1f5; border-radius:14px; overflow:hidden; }
+        .ad-qr-body { padding:16px 20px; display:flex; flex-direction:column; align-items:center; gap:12px; }
+        .ad-qr-canvas-wrap { background:#f9fafb; border:1px solid #f0f1f5; border-radius:10px; padding:12px; display:flex; align-items:center; justify-content:center; }
+        .ad-qr-url { font-size:11px; color:#9ca3af; text-align:center; word-break:break-all; line-height:1.5; }
+        .ad-btn-qr { width:100%; display:flex; align-items:center; justify-content:center; gap:6px; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; padding:9px 16px; border-radius:9px; cursor:pointer; transition:all 0.18s; border:1.5px solid #e0e7ff; background:#eef2ff; color:#4f46e5; }
+        .ad-btn-qr:hover { background:#e0e7ff; border-color:#c7d2fe; }
+
+        /* Warranty panel */
+        .ad-warranty-panel { border-radius:12px; padding:13px 16px; border:1px solid transparent; display:flex; align-items:flex-start; gap:10px; }
+        .ad-warranty-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0; background:rgba(0,0,0,0.06); }
+        .ad-warranty-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:2px; }
+        .ad-warranty-label { font-size:13px; font-weight:600; }
+
+        /* File attachments panel */
+        .ad-file-grid { display:flex; flex-wrap:wrap; gap:8px; padding:14px 16px 0; }
+        .ad-file-thumb { width:72px; height:72px; border-radius:8px; object-fit:cover; cursor:zoom-in; border:1px solid #e5e7eb; transition:transform 0.15s,box-shadow 0.15s; }
+        .ad-file-thumb:hover { transform:scale(1.04); box-shadow:0 4px 14px rgba(0,0,0,0.12); }
+        .ad-file-chip { display:inline-flex; align-items:center; gap:6px; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:8px; padding:5px 10px; font-size:12px; color:#374151; text-decoration:none; max-width:200px; transition:all 0.15s; }
+        .ad-file-chip:hover { border-color:#6366f1; background:#eef2ff; color:#4f46e5; }
+        .ad-file-item { position:relative; display:inline-flex; }
+        .ad-file-remove { position:absolute; top:-5px; right:-5px; width:16px; height:16px; border-radius:50%; background:#ef4444; color:#fff; border:none; font-size:9px; cursor:pointer; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity 0.15s; }
+        .ad-file-item:hover .ad-file-remove { opacity:1; }
+        .ad-upload-btn { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:#6366f1; background:#eef2ff; border:1.5px dashed #c7d2fe; border-radius:8px; padding:6px 12px; cursor:pointer; transition:all 0.15s; margin:10px 16px 14px; }
+        .ad-upload-btn:hover { background:#e0e7ff; border-color:#a5b4fc; }
+
+        /* Lightbox */
+        .ad-lightbox-overlay { position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,0.85); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; cursor:zoom-out; animation:ad-fade-in 0.15s ease; }
+        @keyframes ad-fade-in { from{opacity:0} to{opacity:1} }
+        .ad-lightbox-img { max-width:90vw; max-height:88vh; border-radius:10px; box-shadow:0 24px 80px rgba(0,0,0,0.6); cursor:default; object-fit:contain; }
+        .ad-lightbox-close { position:fixed; top:20px; right:24px; background:rgba(255,255,255,0.12); border:none; color:#fff; width:36px; height:36px; border-radius:50%; font-size:20px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.15s; }
+        .ad-lightbox-close:hover { background:rgba(255,255,255,0.25); }
       `}</style>
 
       <div className="ad-wrap">
@@ -254,6 +299,7 @@ export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivat
                       { label: 'Patrimônio', value: asset.patrimonio },
                       { label: 'Localização', value: asset.localizacao },
                       { label: 'Responsável', value: fullAsset.responsavel_nome || fullAsset.responsavel_email },
+                      { label: 'Garantia até', value: asset.warranty_expires_at ? new Date(asset.warranty_expires_at).toLocaleDateString('pt-BR') : null },
                     ].map(f => (
                       <div key={f.label} className="ad-field">
                         <p className="ad-label">{f.label}</p>
@@ -321,6 +367,15 @@ export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivat
                       <p className="ad-label">Observações</p>
                       <textarea className="ad-textarea" value={observacoes} onChange={e => setObservacoes(e.target.value)} placeholder="Notas adicionais..."/>
                     </div>
+                    <div className="ad-field">
+                      <p className="ad-label">Garantia até</p>
+                      <input
+                        type="date"
+                        className="ad-input"
+                        value={warrantyExpiresAt}
+                        onChange={e => setWarrantyExpiresAt(e.target.value)}
+                      />
+                    </div>
                   </div>
                 )}
               </div>
@@ -329,6 +384,29 @@ export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivat
 
           {/* Right sidebar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Warranty warning panel — only shown when expiring or expired */}
+            {(() => {
+              const w = computeWarranty(asset.warranty_expires_at);
+              if (w.status === 'ok' || w.status === 'none') return null;
+              const c = WARRANTY_COLORS[w.status];
+              return (
+                <div className="ad-warranty-panel" style={{ background: c.bg, borderColor: c.border }}>
+                  <div className="ad-warranty-icon" style={{ background: c.bg }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={c.dot} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      {w.status === 'expired'
+                        ? <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>
+                        : <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>}
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="ad-warranty-title" style={{ color: c.text }}>
+                      {w.status === 'expired' ? 'Garantia vencida' : 'Garantia a vencer'}
+                    </p>
+                    <p className="ad-warranty-label" style={{ color: c.text }}>{w.label}</p>
+                  </div>
+                </div>
+              );
+            })()}
             {/* Meta info */}
             <div className="ad-card">
               <div className="ad-card-hdr"><span className="ad-card-title">Detalhes</span></div>
@@ -380,9 +458,66 @@ export function AssetDetail({ asset, technicians, onBack, onUpdated, onDeactivat
                 )}
               </div>
             </div>
+
+            {/* File attachments card */}
+            <div className="ad-card">
+              <div className="ad-card-hdr">
+                <span className="ad-card-title">Anexos</span>
+                <span style={{fontSize:11,color:'#9ca3af'}}>{assetFiles.length} arquivo{assetFiles.length !== 1 ? 's' : ''}</span>
+              </div>
+              {assetFiles.length > 0 && (
+                <div className="ad-file-grid">
+                  {assetFiles.map(f => {
+                    const isImage = f.type?.startsWith('image/');
+                    return (
+                      <div key={f.id} className="ad-file-item">
+                        {isImage ? (
+                          <img className="ad-file-thumb" src={f.url} alt={f.name} onClick={() => setLightboxUrl(f.url)} />
+                        ) : (
+                          <a href={f.url} target="_blank" rel="noopener noreferrer" className="ad-file-chip">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</span>
+                          </a>
+                        )}
+                        <button className="ad-file-remove" title="Remover" onClick={async () => {
+                          try { await ativos.deleteFile(asset.id, f.id); setAssetFiles(prev => prev.filter(x => x.id !== f.id)); } catch {}
+                        }}>✕</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <input ref={fileInputRef} type="file" multiple style={{display:'none'}}
+                onChange={async (e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (!files.length) return;
+                  setUploadingFiles(true);
+                  try {
+                    const result = await ativos.uploadFiles(asset.id, files);
+                    setAssetFiles(prev => [...prev, ...result.files]);
+                  } catch {} finally {
+                    setUploadingFiles(false);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }
+                }}
+              />
+              <button className="ad-upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploadingFiles}>
+                {uploadingFiles ? <span style={{fontSize:11}}>Enviando...</span> : (
+                  <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>Anexar arquivo</>
+                )}
+              </button>
+            </div>
+
           </div>
         </div>
       </div>
+
+      {lightboxUrl && (
+        <div className="ad-lightbox-overlay" onClick={() => setLightboxUrl(null)}>
+          <button className="ad-lightbox-close" onClick={() => setLightboxUrl(null)}>✕</button>
+          <img className="ad-lightbox-img" src={lightboxUrl} alt="Anexo" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
 
       {/* Deactivate confirmation modal */}
       {confirmDeactivate && (
