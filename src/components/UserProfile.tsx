@@ -127,8 +127,21 @@ export function UserProfile({ onBack, onTicketSelect, onNameChange, onAvatarChan
     }
   };
 
+  const handleRemoveAvatar = async () => {
+    setAvatarUploading(true);
+    try {
+      await usersApi.removeAvatar();
+      setProfile(prev => prev ? { ...prev, avatar_url: null } : null);
+      onAvatarChange?.('');
+    } catch (err) {
+      console.error('Erro ao remover avatar:', err);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const cargoLabel = (cargo: string) => ({
-    admin: 'Administrador',
+    admin: 'Analista TI',
     tecnico: 'Técnico TI',
     usuario: 'Usuário',
   }[cargo] || cargo);
@@ -201,6 +214,16 @@ export function UserProfile({ onBack, onTicketSelect, onNameChange, onAvatarChan
                 </div>
               </div>
               {!readOnly && <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarChange} />}
+              {!readOnly && profile?.avatar_url && (
+                <button
+                  onClick={handleRemoveAvatar}
+                  disabled={avatarUploading}
+                  title="Remover foto"
+                  style={{ marginTop: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 11.5, color: '#ef4444', fontFamily: 'DM Sans, sans-serif', fontWeight: 600, padding: 0, opacity: avatarUploading ? 0.5 : 1 }}
+                >
+                  Remover foto
+                </button>
+              )}
             </div>
 
             {/* Edit / Save buttons */}
@@ -365,8 +388,8 @@ export function UserProfile({ onBack, onTicketSelect, onNameChange, onAvatarChan
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#111827', marginBottom: 3 }}>{a.nome}</div>
                         <div style={{ fontSize: 12, color: '#9ca3af' }}>{a.tipo}{a.localizacao ? ` · ${a.localizacao}` : ''}{a.patrimonio ? ` · ${a.patrimonio}` : ''}</div>
                       </div>
-                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: a.status === 'desativado' ? '#f3f4f6' : '#d1fae5', color: a.status === 'desativado' ? '#6b7280' : '#059669' }}>
-                        {{ disponivel: 'Disponível', em_uso: 'Em Uso', manutencao: 'Manutenção', emprestado: 'Emprestado', desativado: 'Desativado' }[a.status] || a.status}
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 20, background: a.status === 'ativo' ? '#d1fae5' : '#f3f4f6', color: a.status === 'ativo' ? '#059669' : '#6b7280' }}>
+                        {a.status}
                       </span>
                     </div>
                   ))}

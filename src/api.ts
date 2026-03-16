@@ -232,12 +232,11 @@ export interface AtivoFromAPI {
   numero_serie?: string;
   patrimonio?: string;
   localizacao?: string;
-  status: 'disponivel' | 'em_uso' | 'manutencao' | 'emprestado' | 'desativado';
+  status: 'ativo' | 'manutencao' | 'reserva' | 'desativado';
   responsavel_id?: number;
   responsavel_nome?: string;
   responsavel_email?: string;
   observacoes?: string;
-  warranty_expires_at?: string | null;
   created_at: string;
   updated_at: string;
   chamados?: ChamadoFromAPI[];
@@ -249,7 +248,6 @@ export interface CreateAtivoPayload {
   numero_serie?: string;
   patrimonio?: string;
   localizacao?: string;
-  warranty_expires_at?: string;
   status?: AtivoFromAPI['status'];
   responsavel_id?: number;
   observacoes?: string;
@@ -362,6 +360,7 @@ export const users = {
     request<{ message: string }>(`/users/${id}/reset-password`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nova_senha }) }),
   deactivateUser: (id: number) =>
     request<{ message: string }>(`/users/${id}/deactivate`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }),
+  removeAvatar: () => request<{ message: string }>('/users/me/avatar', { method: 'DELETE' }),
   uploadAvatar: async (file: File): Promise<{ avatar_url: string }> => {
     const token = localStorage.getItem('auth_token');
     const form = new FormData();

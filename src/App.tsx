@@ -199,7 +199,10 @@ export default function App() {
   const [showUserSearch, setShowUserSearch] = useState(false);
   const [profileUserId, setProfileUserId] = useState<number | undefined>(undefined);
   const [activeView, setActiveView] = useState<'dashboard' | 'tickets' | 'submit' | 'detail' | 'assets' | 'asset-form' | 'asset-detail' | 'audit-chamado' | 'audit-ativo' | 'profile' | 'users'>(() => {
-    return (sessionStorage.getItem('nav_view') as any) || 'dashboard';
+    const saved = sessionStorage.getItem('nav_view');
+    // These views depend on transient state - always reset to dashboard on refresh
+    if (saved === 'profile' || saved === 'users') return 'dashboard';
+    return (saved as any) || 'dashboard';
   });
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -316,10 +319,9 @@ export default function App() {
       // Sync avatar and name from API
       try {
         const me = await usersApi.getMe();
-        if (me.avatar_url) {
-          setUserAvatar(me.avatar_url);
-          localStorage.setItem('auth_avatar', me.avatar_url);
-        }
+        setUserAvatar(me.avatar_url || null);
+        if (me.avatar_url) localStorage.setItem('auth_avatar', me.avatar_url);
+        else localStorage.removeItem('auth_avatar');
         if (me.nome) {
           setUserName(me.nome);
           localStorage.setItem('auth_name', me.nome);
@@ -440,6 +442,9 @@ export default function App() {
       const mapped = msgs.map((m: any) => ({
         id: String(m.id),
         author: m.author_email || m.author_name,
+        authorName: m.author_name,
+        authorId: m.user_id,
+        avatarUrl: m.avatar_url || null,
         content: m.mensagem,
         timestamp: new Date(m.enviado_em),
         isInternal: m.is_internal,
@@ -460,6 +465,9 @@ export default function App() {
       const mapped = msgs.map((m: any) => ({
         id: String(m.id),
         author: m.author_email || m.author_name,
+        authorName: m.author_name,
+        authorId: m.user_id,
+        avatarUrl: m.avatar_url || null,
         content: m.mensagem,
         timestamp: new Date(m.enviado_em),
         isInternal: m.is_internal,
@@ -482,6 +490,9 @@ export default function App() {
       const mapped = msgs.map((m: any) => ({
         id: String(m.id),
         author: m.author_email || m.author_name,
+        authorName: m.author_name,
+        authorId: m.user_id,
+        avatarUrl: m.avatar_url || null,
         content: m.mensagem,
         timestamp: new Date(m.enviado_em),
         isInternal: m.is_internal,
@@ -519,7 +530,6 @@ export default function App() {
   };
   const myRecent = [...myTickets].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5);
   const myActivity = [...myTickets]
-    .filter(t => t.updatedAt.getTime() !== t.createdAt.getTime() || t.status !== 'open')
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
     .slice(0, 5);
 
@@ -711,7 +721,7 @@ export default function App() {
       closed: tickets.filter(t => t.status === 'closed').length,
       assets: {
         total: assets.length,
-        em_uso: assets.filter(a => a.status === 'em_uso').length,
+        ativo: assets.filter(a => a.status === 'ativo').length,
         manutencao: assets.filter(a => a.status === 'manutencao').length,
         desativado: assets.filter(a => a.status === 'desativado').length,
       },
@@ -1002,7 +1012,7 @@ export default function App() {
               <button onClick={() => setShowUserSearch(true)} className="btn-ghost" style={{ fontSize: 13, padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6 }} title="Buscar usuários">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               </button>
-              <button className="btn-ghost" onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_role'); localStorage.removeItem('auth_email'); localStorage.removeItem('auth_name'); sessionStorage.removeItem('nav_view'); sessionStorage.removeItem('nav_ticket_id'); sessionStorage.removeItem('nav_asset_id'); setIsAuthenticated(false); setAuthToken(null); setToken(null); setTickets([]); setAssets([]); setNotificacoes([]); setShowNotifs(false); navTo('dashboard'); }}>Sair</button>
+              <button className="btn-ghost" onClick={() => { localStorage.removeItem('auth_token'); localStorage.removeItem('auth_role'); localStorage.removeItem('auth_email'); localStorage.removeItem('auth_name'); localStorage.removeItem('auth_avatar'); setUserAvatar(null); sessionStorage.removeItem('nav_view'); sessionStorage.removeItem('nav_ticket_id'); sessionStorage.removeItem('nav_asset_id'); setIsAuthenticated(false); setAuthToken(null); setToken(null); setTickets([]); setAssets([]); setNotificacoes([]); setShowNotifs(false); navTo('dashboard'); }}>Sair</button>
             </div>
           </div>
         </header>
@@ -1041,6 +1051,7 @@ export default function App() {
                   : a));
               }}
               onShowHistory={() => navTo('audit-chamado')}
+              onViewProfile={(userId) => { setProfileUserId(userId); navTo('profile'); }}
             />
           )}
           {activeView === 'assets' && userRole === 'it-executive' && (
@@ -1053,7 +1064,6 @@ export default function App() {
           )}
           {activeView === 'asset-form' && userRole === 'it-executive' && (
             <AssetForm
-              technicians={technicians}
               onSubmit={async (data, files) => {
                 try {
                   const result = await ativosApi.create(data as any);

@@ -21,6 +21,7 @@ interface TicketDetailProps {
   onAssetLinked?: (assetId: number) => void;
   onAssetUnlinked?: (assetId: number) => void;
   onShowHistory?: () => void;
+  onViewProfile?: (userId: number) => void;
 }
 
 const styles = `
@@ -449,7 +450,7 @@ const styles = `
   .td-lightbox-close:hover { background: rgba(255,255,255,0.25); }
 `;
 
-export function TicketDetail({ ticket, userRole, userEmail, userAvatar, technicians, onBack, onAddComment, onRefreshComments, onStatusUpdate, onAddTecnico, onRemoveTecnico, assets = [], onAssetLinked, onAssetUnlinked, onShowHistory }: TicketDetailProps) {
+export function TicketDetail({ ticket, userRole, userEmail, userAvatar, technicians, onBack, onAddComment, onRefreshComments, onStatusUpdate, onAddTecnico, onRemoveTecnico, assets = [], onAssetLinked, onAssetUnlinked, onShowHistory, onViewProfile }: TicketDetailProps) {
   // Live clock for SLA countdown — ticks every minute
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -654,9 +655,14 @@ export function TicketDetail({ ticket, userRole, userEmail, userAvatar, technici
                       const isMe = comment.author === userEmail;
                       return (
                         <div key={comment.id} className="td-comment">
-                          <div className={`td-avatar ${isMe ? 'td-avatar-me' : 'td-avatar-other'}`} style={{overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                            {isMe && userAvatar
-                              ? <img src={userAvatar} alt="avatar" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                          <div
+                            className={`td-avatar ${isMe ? 'td-avatar-me' : 'td-avatar-other'}`}
+                            style={{overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center',cursor: !isMe && comment.authorId && onViewProfile ? 'pointer' : 'default'}}
+                            onClick={() => { if (!isMe && comment.authorId && onViewProfile) onViewProfile(comment.authorId); }}
+                            title={!isMe && onViewProfile ? 'Ver perfil' : undefined}
+                          >
+                            {(isMe ? userAvatar : comment.avatarUrl)
+                              ? <img src={isMe ? userAvatar! : comment.avatarUrl} alt="avatar" style={{width:'100%',height:'100%',objectFit:'cover'}} />
                               : getInitials(comment.author)
                             }
                           </div>
@@ -908,7 +914,7 @@ export function TicketDetail({ ticket, userRole, userEmail, userAvatar, technici
                     <option value="resolved">Resolvido</option>
                     <option value="closed">Fechado</option>
                   </select>
-                  {
+                  {true && (
                     <>
                       <p className="td-action-label">Técnicos</p>
                       {(ticket.tecnicos || []).map((tc: any) => (
@@ -928,7 +934,7 @@ export function TicketDetail({ ticket, userRole, userEmail, userAvatar, technici
                         ))}
                       </select>
                     </>
-                  }
+                  )}
                 </div>
               </div>
             )}

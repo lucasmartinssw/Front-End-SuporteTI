@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Ticket } from './TicketForm';
 import { computeSLA, SLA_COLORS, SLAInfo } from '../sla';
 
@@ -377,6 +377,7 @@ export function TicketList({ tickets, userRole, userEmail, isLoading = false, te
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [overdueOnly, setOverdueOnly] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 15;
@@ -388,6 +389,7 @@ export function TicketList({ tickets, userRole, userEmail, isLoading = false, te
     if (priorityFilter !== 'all' && ticket.priority !== priorityFilter) return false;
     if (dateFrom) { const from = new Date(dateFrom); from.setHours(0,0,0,0); if (ticket.createdAt < from) return false; }
     if (dateTo) { const to = new Date(dateTo); to.setHours(23,59,59,999); if (ticket.createdAt > to) return false; }
+    if (overdueOnly && computeSLA(ticket.priority, ticket.status, ticket.createdAt).status !== 'overdue') return false;
     return true;
   }).sort((a, b) => {
     const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
@@ -476,6 +478,23 @@ export function TicketList({ tickets, userRole, userEmail, isLoading = false, te
             </svg>
             {sortOrder === 'newest' ? 'Mais recentes' : 'Mais antigos'}
           </button>
+          <button
+            onClick={() => setOverdueOnly(o => !o)}
+            style={{
+              height: 38, padding: '0 14px', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'DM Sans, sans-serif', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+              border: overdueOnly ? 'none' : '1.5px solid #e5e7eb',
+              background: overdueOnly ? 'linear-gradient(135deg, #ef4444, #dc2626)' : '#fff',
+              color: overdueOnly ? '#fff' : '#6b7280',
+              transition: 'all 0.15s',
+            }}
+            title="Mostrar apenas chamados com SLA vencido"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            Em Atraso
+          </button>
         </div>
 
         <div className="tl-toolbar">
@@ -512,12 +531,12 @@ export function TicketList({ tickets, userRole, userEmail, isLoading = false, te
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             </div>
             <p className="tl-empty-title">
-              {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' || dateFrom || dateTo
+              {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' || dateFrom || dateTo || overdueOnly
                 ? 'Nenhum resultado encontrado'
                 : userRole === 'client' ? 'Você ainda não tem chamados' : 'Nenhum chamado no sistema'}
             </p>
             <p className="tl-empty-sub">
-              {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' || dateFrom || dateTo
+              {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all' || dateFrom || dateTo || overdueOnly
                 ? 'Tente ajustar os filtros ou limpar a pesquisa.'
                 : userRole === 'client' ? 'Clique em "Enviar Chamado" para abrir seu primeiro chamado.' : 'Os chamados aparecerão aqui assim que forem criados.'}
             </p>
