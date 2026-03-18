@@ -1079,6 +1079,7 @@ export default function App() {
                 }
               }}
               onCancel={() => navTo('assets')}
+              technicians={technicians}
             />
           )}
           {activeView === 'asset-detail' && selectedAsset && userRole === 'it-executive' && (
