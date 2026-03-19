@@ -303,6 +303,7 @@ export function TicketForm({ onSubmit, userEmail, assets = [] }: TicketFormProps
 
   const removeFile = (index: number) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const priorities = [
@@ -375,7 +376,7 @@ export function TicketForm({ onSubmit, userEmail, assets = [] }: TicketFormProps
                       value={assetSearch}
                       onChange={e => { setAssetSearch(e.target.value); setAssetDropdown(true); }}
                       onFocus={() => setAssetDropdown(true)}
-                      onBlur={() => setTimeout(() => setAssetDropdown(false), 150)}
+                      onBlur={() => setTimeout(() => setAssetDropdown(false), 50)}
                     />
                     {assetDropdown && (
                       <div className="tf-asset-dropdown">
@@ -399,11 +400,11 @@ export function TicketForm({ onSubmit, userEmail, assets = [] }: TicketFormProps
             {/* File upload */}
             <div className="tf-field">
               <label className="tf-label">Anexos</label>
-              <input ref={fileInputRef} type="file" multiple style={{display:'none'}} onChange={handleFileSelect} />
-              <div className="tf-upload-area" onClick={() => fileInputRef.current?.click()}>
+              <input id="tf-file-input" ref={fileInputRef} type="file" multiple style={{display:'none'}} onChange={handleFileSelect} />
+              <label htmlFor="tf-file-input" className="tf-upload-area" style={{cursor:'pointer'}} onMouseDown={() => setAssetDropdown(false)}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
                 <span className="tf-upload-text"><strong>Clique para anexar</strong> ou arraste arquivos aqui</span>
-              </div>
+              </label>
               {files.length > 0 && (
                 <div className="tf-file-list">
                   {files.map((file, idx) => {
