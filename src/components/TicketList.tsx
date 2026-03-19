@@ -382,8 +382,9 @@ export function TicketList({ tickets, userRole, userEmail, isLoading = false, te
   const [currentPage, setCurrentPage] = useState(1);
   const PAGE_SIZE = 15;
 
+  const normalizedUserEmail = userEmail.trim().toLowerCase();
   const filteredTickets = tickets.filter(ticket => {
-    if (userRole === 'client' && ticket.submittedBy !== userEmail) return false;
+    if (userRole === 'client' && (ticket.submittedBy || '').toLowerCase() !== normalizedUserEmail) return false;
     if (searchTerm && !ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) && !ticket.description.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     if (statusFilter !== 'all' && ticket.status !== statusFilter) return false;
     if (priorityFilter !== 'all' && ticket.priority !== priorityFilter) return false;

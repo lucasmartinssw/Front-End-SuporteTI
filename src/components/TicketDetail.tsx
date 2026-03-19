@@ -487,7 +487,11 @@ export function TicketDetail({ ticket, userRole, userEmail, userAvatar, technici
   const [selectedAssetId, setSelectedAssetId] = useState<string>('');
   const [isLinkingAsset, setIsLinkingAsset] = useState(false);
   const [linkedAssets, setLinkedAssets] = useState<{id:number;nome:string;tipo:string}[]>(
-    ticket.assetId ? [{ id: ticket.assetId, nome: ticket.assetNome || `Ativo #${ticket.assetId}`, tipo: '' }] : []
+    ticket.assets && ticket.assets.length > 0
+      ? ticket.assets
+      : ticket.assetId
+        ? [{ id: ticket.assetId, nome: ticket.assetNome || `Ativo #${ticket.assetId}`, tipo: '' }]
+        : []
   );
   const [unlinkingAssetId, setUnlinkingAssetId] = useState<number | null>(null);
 
@@ -947,7 +951,7 @@ export function TicketDetail({ ticket, userRole, userEmail, userAvatar, technici
                     <span className="td-card-title">Meu chamado</span>
                   </div>
                   <div className="td-card-body" style={{padding:'16px 20px'}}>
-                    {ticket.status !== 'closed' ? (
+                    {(ticket.status !== 'resolved' && ticket.status !== 'closed') ? (
                       <>
                         <p style={{fontSize:12.5,color:'#6b7280',marginBottom:10,lineHeight:1.5}}>Problema resolvido? Feche o chamado para informar a equipe de TI.</p>
                         <button

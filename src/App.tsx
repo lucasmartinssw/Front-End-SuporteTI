@@ -186,13 +186,20 @@ const appStyles = `
 `;
 
 export default function App() {
+  const normalizeRole = (role: string | null | undefined): 'client' | 'it-executive' => {
+    if (!role) return 'client';
+    const value = role.toLowerCase();
+    if (value === 'tecnico' || value === 'admin' || value === 'it-executive') return 'it-executive';
+    return 'client';
+  };
+
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('auth_token'));
   const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
   const [sessionExpired, setSessionExpired] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isLoadingTickets, setIsLoadingTickets] = useState(false);
   const [isLoadingAssets, setIsLoadingAssets] = useState(false);
-  const [userRole, setUserRole] = useState<'client' | 'it-executive'>(() => (localStorage.getItem('auth_role') as any) || 'client');
+  const [userRole, setUserRole] = useState<'client' | 'it-executive'>(() => normalizeRole(localStorage.getItem('auth_role')));
   const [userEmail, setUserEmail] = useState(() => localStorage.getItem('auth_email') || '');
   const [userName, setUserName] = useState(() => localStorage.getItem('auth_name') || '');
   const [userAvatar, setUserAvatar] = useState<string | null>(() => localStorage.getItem('auth_avatar') || null);
@@ -287,8 +294,9 @@ export default function App() {
         status: STATUS_MAP[t.status_id] || 'open',
         submittedBy: t.user_email || '',
         tecnicos: (t.tecnicos || []) as {id: number; nome: string; email: string}[],
-        assetId: t.ativo_id,
-        assetNome: t.ativo_nome,
+        assetId: t.ativo_id ?? (t.ativos?.[0]?.id),
+        assetNome: t.ativo_nome ?? (t.ativos?.[0]?.nome),
+        assets: (t.ativos || []).map((a: any) => ({ id: a.id, nome: a.nome, tipo: a.tipo, localizacao: a.localizacao })),
         attachments: t.attachments || [],
         createdAt: new Date(t.created_at),
         updatedAt: new Date(t.updated_at ?? t.created_at),
@@ -375,12 +383,13 @@ export default function App() {
 
   const handleSubmitTicket = async (ticketData: Omit<Ticket, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'comments'>, files?: File[]) => {
     try {
-      const payload = {
+      const payload: any = {
         title: ticketData.title,
         description: ticketData.description,
         priority: ticketData.priority,
         category: ticketData.category,
       };
+      if (ticketData.assetId) payload.asset_id = ticketData.assetId;
       if (files?.length) {
         await chamadosApi.createWithFiles(payload, files);
       } else {
@@ -521,7 +530,8 @@ export default function App() {
   };
 
   // ── CLIENT dashboard — scoped to userEmail ───────────
-  const myTickets = tickets.filter(t => t.submittedBy === userEmail);
+  const normalizedEmail = userEmail.trim().toLowerCase();
+  const myTickets = tickets.filter(t => (t.submittedBy || '').toLowerCase() === normalizedEmail);
   const myStats = {
     total: myTickets.length,
     open: myTickets.filter(t => t.status === 'open').length,
@@ -924,9 +934,7 @@ export default function App() {
                 <button className={`nav-btn ${activeView === 'tickets' || activeView === 'detail' ? 'active' : ''}`} onClick={() => navTo('tickets')}>
                   {userRole === 'client' ? 'Meus Chamados' : 'Todos os Chamados'}
                 </button>
-                {userRole === 'client' && (
-                  <button className={`nav-btn ${activeView === 'submit' ? 'active' : ''}`} onClick={() => navTo('submit')}>Enviar Chamado</button>
-                )}
+                <button className={`nav-btn ${activeView === 'submit' ? 'active' : ''}`} onClick={() => navTo('submit')}>Enviar Chamado</button>
                 {userRole === 'it-executive' && (
                   <>
                     <button className={`nav-btn ${activeView === 'assets' || activeView === 'asset-form' || activeView === 'asset-detail' ? 'active' : ''}`} onClick={() => navTo('assets')}>
@@ -1022,7 +1030,7 @@ export default function App() {
           {activeView === 'tickets' && (
             <TicketList tickets={tickets} userRole={userRole} userEmail={userEmail} isLoading={isLoadingTickets} technicians={technicians} onTicketSelect={handleTicketSelect} onStatusUpdate={handleStatusUpdate} onAddTecnico={handleAddTecnico} onRemoveTecnico={handleRemoveTecnico} />
           )}
-          {activeView === 'submit' && userRole === 'client' && (
+          {activeView === 'submit' && (
             <TicketForm onSubmit={handleSubmitTicket} userEmail={userEmail} assets={assets.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, localizacao: a.localizacao }))} />
           )}
           {activeView === 'detail' && selectedTicket && (

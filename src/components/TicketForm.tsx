@@ -22,6 +22,7 @@ export interface Ticket {
     isInternal: boolean;
     attachments?: Array<{ id: string; url: string; name: string; type: string }>;
   }>;
+  assets?: Array<{ id: number; nome: string; tipo: string; localizacao?: string }>;
 }
 
 interface AssetOption { id: number; nome: string; tipo: string; localizacao?: string; }

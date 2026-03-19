@@ -147,6 +147,7 @@ export interface CreateChamadoPayload {
   description: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   category: string;
+  asset_id?: number;
 }
 
 export const chamados = {
@@ -172,6 +173,9 @@ export const chamados = {
     form.append('description', payload.description);
     form.append('priority', payload.priority);
     form.append('category', payload.category);
+    if (payload.asset_id) {
+      form.append('asset_id', String(payload.asset_id));
+    }
     if (files?.length) {
       files.forEach(f => form.append('files', f));
     }
