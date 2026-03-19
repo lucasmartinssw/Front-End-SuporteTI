@@ -350,7 +350,13 @@ export const notificacoes = {
 };
 
 export const users = {
-  list: (cargo?: string, includeInactive?: boolean) => request<UserFromAPI[]>(`/users${cargo ? `?cargo=${cargo}` : ''}${includeInactive ? `${cargo ? '&' : '?'}include_inactive=true` : ''}`),
+  list: (cargo?: string, includeInactive?: boolean) => {
+    const params = new URLSearchParams();
+    if (cargo) params.append('cargo', cargo);
+    if (includeInactive) params.append('include_inactive', 'true');
+    const qs = params.toString();
+    return request<UserFromAPI[]>(qs ? `/users?${qs}` : '/users');
+  },
   getMe: () => request<any>('/users/me'),
   getUserProfile: (id: number) => request<any>(`/users/${id}/profile`),
   updateMe: (data: { nome?: string; bio?: string }) => request<{ message: string }>('/users/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
@@ -358,6 +364,8 @@ export const users = {
     request<{ message: string }>(`/users/${id}/admin`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
   resetPassword: (id: number, nova_senha: string) =>
     request<{ message: string }>(`/users/${id}/reset-password`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nova_senha }) }),
+  reactivateUser: (id: number) =>
+    request<{ message: string }>(`/users/${id}/reactivate`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }),
   deactivateUser: (id: number) =>
     request<{ message: string }>(`/users/${id}/deactivate`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }),
   removeAvatar: () => request<{ message: string }>('/users/me/avatar', { method: 'DELETE' }),

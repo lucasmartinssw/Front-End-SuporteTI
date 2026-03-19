@@ -7,7 +7,7 @@ interface User {
   email: string;
   cargo: string;
   avatar_url: string | null;
-  ativo?: boolean;
+  ativo?: boolean | number;
 }
 
 interface Props {
@@ -15,8 +15,8 @@ interface Props {
 }
 
 const CARGO_LABEL: Record<string, string> = {
-  admin: 'Administrador',
-  tecnico: 'Técnico TI',
+  admin: 'Analista TI',
+  tecnico: 'Analista TI',
   usuario: 'Usuário',
 };
 const CARGO_COLOR: Record<string, string> = {
@@ -65,14 +65,15 @@ const CSS = `
   .um-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
   .um-btn-danger { height: 38px; padding: 0 20px; border: none; border-radius: 9px; background: #ef4444; font-size: 13px; font-weight: 600; color: #fff; cursor: pointer; font-family: 'DM Sans', sans-serif; }
   .um-error { font-size: 12px; color: #ef4444; margin-top: 5px; }
-  .um-inactive { opacity: 0.45; }
+  .um-inactive { opacity: 0.6; }
 `;
 
-type ModalMode = 'edit' | 'reset-password' | 'deactivate' | null;
+type ModalMode = 'edit' | 'reset-password' | 'deactivate' | 'reactivate' | null;
 
 export function UserManagement({ onBack }: Props) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [cargoFilter, setCargoFilter] = useState('all');
   const [modal, setModal] = useState<ModalMode>(null);
@@ -90,10 +91,13 @@ export function UserManagement({ onBack }: Props) {
 
   const loadUsers = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const data = await (usersApi as any).list(undefined, true);
       setUsers(data as User[]);
-    } catch { /* ignore */ } finally {
+    } catch (e: any) {
+      setLoadError(e?.message || 'Erro ao carregar usuários.');
+    } finally {
       setLoading(false);
     }
   };
@@ -113,6 +117,11 @@ export function UserManagement({ onBack }: Props) {
   const openDeactivate = (u: User) => {
     setSelectedUser(u);
     setModal('deactivate');
+  };
+
+  const openReactivate = (u: User) => {
+    setSelectedUser(u);
+    setModal('reactivate');
   };
 
   const closeModal = () => { setModal(null); setSelectedUser(null); setFormError(''); };
@@ -152,6 +161,16 @@ export function UserManagement({ onBack }: Props) {
     } catch { /* ignore */ } finally { setSaving(false); }
   };
 
+  const handleReactivate = async () => {
+    if (!selectedUser) return;
+    setSaving(true);
+    try {
+      await (usersApi as any).reactivateUser(selectedUser.id);
+      closeModal();
+      loadUsers();
+    } catch { } finally { setSaving(false); }
+  };
+
   const filtered = users.filter(u => {
     const q = search.toLowerCase();
     const matchSearch = !q || u.nome.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
@@ -187,7 +206,7 @@ export function UserManagement({ onBack }: Props) {
           </div>
           <select className="um-select" value={cargoFilter} onChange={e => setCargoFilter(e.target.value)}>
             <option value="all">Todos os cargos</option>
-            <option value="tecnico">Técnico TI</option>
+            <option value="tecnico">Analista TI</option>
             <option value="usuario">Usuário</option>
           </select>
         </div>
@@ -195,6 +214,11 @@ export function UserManagement({ onBack }: Props) {
         {/* Table */}
         {loading ? (
           <div className="um-empty">Carregando...</div>
+        ) : loadError ? (
+          <div className="um-empty" style={{ color: '#ef4444' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>⚠️</div>
+            {loadError}
+          </div>
         ) : filtered.length === 0 ? (
           <div className="um-empty">
             <div style={{ fontSize: 32, marginBottom: 8 }}>👥</div>
@@ -213,7 +237,7 @@ export function UserManagement({ onBack }: Props) {
             <tbody>
               {filtered.map(u => {
                 const color = CARGO_COLOR[u.cargo] || '#6b7280';
-                const inactive = u.ativo === false;
+                const inactive = u.ativo === false || u.ativo === 0;
                 return (
                   <tr key={u.id} className={`um-tr${inactive ? ' um-inactive' : ''}`}>
                     <td className="um-td">
@@ -226,7 +250,11 @@ export function UserManagement({ onBack }: Props) {
                         </div>
                         <div>
                           <div style={{ fontWeight: 600, color: '#111827', fontSize: 13.5 }}>{u.nome}</div>
-                          {inactive && <div style={{ fontSize: 11, color: '#ef4444', fontWeight: 600 }}>Desativado</div>}
+                          {inactive && (
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#fef2f2', color: '#ef4444', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                              Desativado
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -247,7 +275,13 @@ export function UserManagement({ onBack }: Props) {
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                         </button>
                         {/* Deactivate */}
-                        {!inactive && (
+                        {inactive ? (
+                          <button className="um-action-btn" onClick={() => openReactivate(u)} title="Reativar usuário" style={{ color: '#10b981' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#f0fdf4'; e.currentTarget.style.color = '#059669'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#10b981'; }}>
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                          </button>
+                        ) : (
                           <button className="um-action-btn danger" onClick={() => openDeactivate(u)} title="Desativar usuário">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
                           </button>
@@ -280,7 +314,7 @@ export function UserManagement({ onBack }: Props) {
               <label className="um-label">Cargo</label>
               <select className="um-input" value={formCargo} onChange={e => setFormCargo(e.target.value)} style={{ cursor: 'pointer' }}>
                 <option value="usuario">Usuário</option>
-                <option value="tecnico">Técnico TI</option>
+                <option value="tecnico">Analista TI</option>
               </select>
             </div>
             {formError && <p className="um-error">{formError}</p>}
@@ -306,6 +340,22 @@ export function UserManagement({ onBack }: Props) {
             <div className="um-modal-footer">
               <button className="um-btn-ghost" onClick={closeModal}>Cancelar</button>
               <button className="um-btn-primary" onClick={handleResetPassword} disabled={saving}>{saving ? 'Salvando...' : 'Redefinir'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reactivate Modal ─────────────────────────── */}
+      {modal === 'reactivate' && selectedUser && (
+        <div className="um-modal-overlay" onClick={e => e.target === e.currentTarget && closeModal()}>
+          <div className="um-modal">
+            <h2 className="um-modal-title">Reativar usuário</h2>
+            <p style={{ fontSize: 13.5, color: '#6b7280', marginBottom: 20, lineHeight: 1.6 }}>
+              Reativar <strong style={{ color: '#111827' }}>{selectedUser.nome}</strong>? O usuário voltará a conseguir fazer login.
+            </p>
+            <div className="um-modal-footer">
+              <button className="um-btn-ghost" onClick={closeModal}>Cancelar</button>
+              <button className="um-btn-primary" onClick={handleReactivate} disabled={saving}>{saving ? 'Reativando...' : 'Reativar'}</button>
             </div>
           </div>
         </div>
